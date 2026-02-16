@@ -3,18 +3,17 @@ pragma solidity ^0.8.20;
 
 /**
  * @title MassachusettsBuildingPermits
- * @author NoblePort ETF - Building Permits Module
- * @notice MA-780-CMR compliant building permit management for Massachusetts
- * @dev Production-ready contract with:
- *      - Primary permits + trade sub-permits (electrical, plumbing, gas, mechanical)
- *      - Sequential approval workflow (zoning → building → trades)
- *      - USDC fee payments with full audit trail
- *      - Role-segmented authority model with license verification
- *      - Immutable plan anchoring (IPFS/Arweave)
- *      - Town-scoped jurisdiction permissions
+ * @author NoblePort ETF - Construction Workflow Intelligence Engine
+ * @notice Production-grade building permit management with AGI reasoning layer
+ * @dev Hardened contract features:
+ *      - Separate state machines for primary vs trade permits
+ *      - Deterministic dependency enforcement (no guessing)
+ *      - AI compliance scoring for AGI reasoning
+ *      - Stripe/escrow-compatible financial milestones
+ *      - Voice-avatar deterministic status output
+ *      - Multi-jurisdiction support
  *
- * Compliance: Massachusetts State Building Code 780 CMR (9th Edition)
- * Reference: https://www.mass.gov/orgs/board-of-building-regulations-and-standards
+ * Compliance: MA 780 CMR 10th Edition | MGL c.143 ss.93-100
  */
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -26,118 +25,124 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 contract MassachusettsBuildingPermits is AccessControl, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
-    // ============ 780 CMR Code Reference ============
+    // ============ Code References ============
 
-    string public constant MA_BUILDING_CODE_VERSION = "780 CMR 9th Edition (2017, as amended)";
-    string public constant COMPLIANCE_REFERENCE = "MGL c.143, ss.93-100";
+    string public constant VERSION = "2.0.0-hardened";
+    string public constant MA_CODE_REF = "780 CMR 10th Edition";
+    string public constant STATUTORY_REF = "MGL c.143, ss.93-100";
 
-    // ============ Role Hierarchy (Authority Model) ============
+    // ============ Role Hierarchy ============
 
-    // State-level roles
-    bytes32 public constant STATE_BUILDING_COMMISSIONER = keccak256("STATE_BUILDING_COMMISSIONER");
-    bytes32 public constant STATE_FIRE_MARSHAL = keccak256("STATE_FIRE_MARSHAL");
+    bytes32 public constant STATE_COMMISSIONER = keccak256("STATE_COMMISSIONER");
+    bytes32 public constant BUILDING_OFFICIAL = keccak256("BUILDING_OFFICIAL");
+    bytes32 public constant ELECTRICAL_INSPECTOR = keccak256("ELECTRICAL_INSPECTOR");
+    bytes32 public constant PLUMBING_INSPECTOR = keccak256("PLUMBING_INSPECTOR");
+    bytes32 public constant GAS_INSPECTOR = keccak256("GAS_INSPECTOR");
+    bytes32 public constant MECHANICAL_INSPECTOR = keccak256("MECHANICAL_INSPECTOR");
+    bytes32 public constant FIRE_INSPECTOR = keccak256("FIRE_INSPECTOR");
+    bytes32 public constant ZONING_OFFICER = keccak256("ZONING_OFFICER");
+    bytes32 public constant MUNICIPAL_CLERK = keccak256("MUNICIPAL_CLERK");
 
-    // Municipality roles (town-scoped)
-    bytes32 public constant BUILDING_OFFICIAL = keccak256("BUILDING_OFFICIAL");      // Can approve building permits
-    bytes32 public constant ELECTRICAL_INSPECTOR = keccak256("ELECTRICAL_INSPECTOR"); // Trade-specific
-    bytes32 public constant PLUMBING_INSPECTOR = keccak256("PLUMBING_INSPECTOR");     // Trade-specific
-    bytes32 public constant GAS_INSPECTOR = keccak256("GAS_INSPECTOR");               // Trade-specific
-    bytes32 public constant MECHANICAL_INSPECTOR = keccak256("MECHANICAL_INSPECTOR"); // Trade-specific (HVAC)
-    bytes32 public constant FIRE_INSPECTOR = keccak256("FIRE_INSPECTOR");             // Fire protection
-    bytes32 public constant ZONING_OFFICER = keccak256("ZONING_OFFICER");             // Zoning approval
-    bytes32 public constant MUNICIPAL_CLERK = keccak256("MUNICIPAL_CLERK");           // Fee collection/audit
+    // ============ FIX #1: Separate State Machines ============
+    // Primary and trade lifecycles are NOT identical
 
-    // Licensed professionals
-    bytes32 public constant LICENSED_CONTRACTOR = keccak256("LICENSED_CONTRACTOR");
-    bytes32 public constant LICENSED_ELECTRICIAN = keccak256("LICENSED_ELECTRICIAN");
-    bytes32 public constant LICENSED_PLUMBER = keccak256("LICENSED_PLUMBER");
-    bytes32 public constant LICENSED_GAS_FITTER = keccak256("LICENSED_GAS_FITTER");
+    /// @notice Primary permit lifecycle (can expire, requires zoning)
+    enum PrimaryPhase {
+        Draft,          // 0: Application created
+        Submitted,      // 1: Submitted for review
+        ZoningReview,   // 2: Awaiting zoning clearance
+        PlanReview,     // 3: Technical plan review
+        Approved,       // 4: Approved, pending fees
+        Issued,         // 5: Permit card issued ← GATE for trades
+        Active,         // 6: Construction in progress
+        FinalInspection,// 7: Final inspection phase
+        Finaled,        // 8: Certificate of Occupancy issued
+        Expired,        // 9: 180 days no activity
+        Revoked,        // 10: Permit revoked
+        Suspended       // 11: Stop work order
+    }
+
+    /// @notice Trade permit lifecycle (inspection-centric, no zoning)
+    enum TradePhase {
+        Pending,        // 0: Created, awaiting submission
+        Submitted,      // 1: Submitted for review
+        Issued,         // 2: Trade permit issued
+        RoughScheduled, // 3: Rough inspection scheduled
+        RoughPassed,    // 4: Rough inspection passed
+        RoughFailed,    // 5: Rough inspection failed
+        FinalScheduled, // 6: Final inspection scheduled
+        Inspected,      // 7: All inspections complete
+        Finaled,        // 8: Trade work signed off
+        Rejected,       // 9: Application rejected
+        Voided          // 10: Voided with refund
+    }
+
+    // ============ FIX #7: Jurisdiction Switch ============
+
+    enum Jurisdiction {
+        MA_10th,        // Massachusetts 780 CMR 10th Edition
+        MA_9th,         // Massachusetts 780 CMR 9th Edition (legacy)
+        NYC_DOB,        // New York City DOB
+        CA_2022,        // California 2022 Building Code
+        Custom          // Custom ruleset
+    }
 
     // ============ Enums ============
 
-    enum PrimaryPermitType {
-        RESIDENTIAL_NEW_CONSTRUCTION,    // 1-2 family, <35ft height
-        RESIDENTIAL_ADDITION,            // Additions to existing
-        RESIDENTIAL_RENOVATION,          // Alterations
-        MULTIFAMILY_NEW_CONSTRUCTION,    // 3+ units
-        COMMERCIAL_NEW_CONSTRUCTION,     // Use groups A, B, E, M
-        COMMERCIAL_TENANT_FITOUT,        // Interior buildout
-        INDUSTRIAL_NEW_CONSTRUCTION,     // Use groups F, H, S
-        MIXED_USE,                       // Combined residential/commercial
-        DEMOLITION_FULL,                 // Complete demolition
-        DEMOLITION_PARTIAL,              // Partial demolition
-        FOUNDATION_ONLY,                 // Foundation permit
-        SHELL_ONLY,                      // Core/shell only
-        ACCESSORY_DWELLING_UNIT,         // ADU per Housing Choice Act
-        DECK_PORCH,                      // Exterior structures
-        SWIMMING_POOL,                   // Pool installation
-        SOLAR_PV,                        // Solar/PV per 780 CMR 115.R10
-        TEMPORARY_STRUCTURE,             // Tents, temp buildings
-        CHANGE_OF_USE                    // Use/occupancy change
+    enum PrimaryType {
+        NewConstruction,
+        Addition,
+        Alteration,
+        Remodel,
+        Demolition,
+        ChangeOfUse,
+        ShellOnly,
+        ADU,
+        SolarPV,
+        Other
     }
 
-    enum TradePermitType {
-        ELECTRICAL,          // Per 527 CMR
-        PLUMBING,           // Per 248 CMR
-        GAS,                // Per 248 CMR
-        MECHANICAL_HVAC,    // Per 780 CMR Chapter 12
-        FIRE_SUPPRESSION,   // Sprinkler systems
-        FIRE_ALARM,         // Fire alarm systems
-        LOW_VOLTAGE,        // Security, data, telecom
-        ELEVATOR,           // Per 524 CMR
-        FUEL_STORAGE        // Underground/aboveground tanks
+    enum TradeType {
+        Electrical,
+        Plumbing,
+        Gas,
+        Mechanical,
+        Fire,
+        LowVoltage,
+        Elevator,
+        Other
     }
 
-    enum ApprovalPhase {
-        DRAFT,                    // Application created
-        ZONING_REVIEW,            // Awaiting zoning clearance
-        ZONING_APPROVED,          // Zoning cleared
-        ZONING_VARIANCE_REQUIRED, // Needs ZBA variance
-        PLAN_REVIEW,              // Technical plan review
-        PLAN_CORRECTIONS_NEEDED,  // Plans need revision
-        PLAN_APPROVED,            // Plans approved, pending fees
-        FEES_PENDING,             // Awaiting fee payment
-        FEES_PAID,                // All fees paid
-        PERMIT_ISSUED,            // Permit card issued
-        CONSTRUCTION_ACTIVE,      // Work in progress
-        INSPECTION_REQUIRED,      // Inspection needed
-        INSPECTION_FAILED,        // Failed inspection
-        INSPECTION_PASSED,        // Passed inspection
-        TRADES_PENDING,           // Awaiting trade permits
-        FINAL_INSPECTION,         // Final inspection phase
-        CO_PENDING,               // Awaiting C/O
-        COMPLETED,                // Certificate of Occupancy issued
-        EXPIRED,                  // Permit expired (180 days no activity)
-        REVOKED,                  // Permit revoked
-        VOIDED,                   // Permit voided (refund eligible)
-        SUSPENDED                 // Permit suspended (stop work)
+    /// @notice FIX #4: Upgraded inspection types for real execution
+    enum InspectionType {
+        Underground,    // Below grade
+        Rough,          // Before drywall
+        TopOut,         // Above ceiling
+        Final,          // Completion inspection
+        Reinspection    // Failed re-check
     }
 
-    enum InspectionCategory {
-        // Building inspections
-        FOOTING_FOUNDATION,
-        FOUNDATION_WATERPROOFING,
-        ROUGH_FRAMING,
-        SHEATHING,
-        INSULATION_ENERGY,       // Per 780 CMR Chapter 13 (IECC)
-        FIRE_BLOCKING,
-        FINAL_BUILDING,
-        // Trade inspections (must be by licensed trade inspector)
-        ELECTRICAL_ROUGH,
-        ELECTRICAL_FINAL,
-        PLUMBING_ROUGH,
-        PLUMBING_FINAL,
-        PLUMBING_WATER_TEST,
-        GAS_ROUGH,
-        GAS_FINAL,
-        GAS_PRESSURE_TEST,
-        MECHANICAL_ROUGH,
-        MECHANICAL_FINAL,
-        FIRE_SUPPRESSION_ROUGH,
-        FIRE_SUPPRESSION_FINAL,
-        FIRE_ALARM,
-        // Final
-        CERTIFICATE_OF_OCCUPANCY
+    enum InspectionResult {
+        Pending,        // Not yet performed
+        Passed,         // Approved
+        Failed,         // Requires corrections
+        Conditional     // Passed with conditions
+    }
+
+    /// @notice FIX #3: AI risk levels for compliance scoring
+    enum RiskLevel {
+        Low,            // Score 80-100
+        Medium,         // Score 50-79
+        High            // Score 0-49
+    }
+
+    /// @notice FIX #5: Payment milestone triggers
+    enum MilestoneTrigger {
+        OnSubmission,       // Pay on permit submission
+        OnIssuance,         // Pay on permit issuance
+        OnInspectionPass,   // Release on inspection pass
+        OnFinaled,          // Release on final signoff
+        Manual              // Manual release
     }
 
     // ============ Structs ============
@@ -145,32 +150,25 @@ contract MassachusettsBuildingPermits is AccessControl, ReentrancyGuard, Pausabl
     struct Municipality {
         bytes32 id;
         string name;
-        string maCounty;              // One of 14 MA counties
-        uint16 townCode;              // MA DOR town code (001-351)
-        address treasury;             // USDC collection address
-        address buildingDepartment;   // Primary contact
-        bool acceptsOnlinePermits;
+        uint16 townCode;
+        address treasury;
+        Jurisdiction jurisdiction;
         bool isActive;
-        uint256 totalRevenue;         // Total fees collected (6 decimals)
         uint256 permitsIssued;
-        uint256 createdAt;
+        uint256 totalRevenue;
     }
 
     struct JurisdictionGrant {
         bytes32 municipalityId;
         bytes32 role;
-        uint256 grantedAt;
-        uint256 expiresAt;            // 0 = no expiry
+        uint256 expiresAt;
         bool isActive;
     }
 
     struct License {
         address holder;
         string licenseNumber;
-        string licenseType;           // CSL, HIC, Master Electrician, etc.
-        string ensName;               // ENS DID for verification
-        bytes32 issuingAuthority;     // State board that issued
-        uint256 issuedAt;
+        string licenseType;
         uint256 expiresAt;
         bool isActive;
         bool isSuspended;
@@ -182,1517 +180,1023 @@ contract MassachusettsBuildingPermits is AccessControl, ReentrancyGuard, Pausabl
         string city;
         string zipCode;
         bytes32 municipalityId;
-        string parcelId;              // Assessor's map-lot
-        string zoningDistrict;        // R1, R2, B1, I1, etc.
-        string floodZone;             // FEMA flood zone if applicable
-        bool isHistoricDistrict;
-        bool requiresHDCApproval;     // Historic District Commission
+        string parcelId;
+        string zoningDistrict;
     }
 
-    struct StampedPlanSet {
-        string plansCID;              // IPFS/Arweave CID - IMMUTABLE after lock
-        string specsDocCID;           // Specifications CID
-        string structuralCalcsCID;    // Structural calculations CID
-        string energyComplianceCID;   // REScheck/COMcheck CID
-        address stampedBy;            // Licensed architect/engineer
-        string peLicenseNumber;       // PE/RA license number
-        uint256 stampedAt;
-        bool isLocked;                // Once true, cannot be modified
+    /// @notice Immutable plan set with IPFS/Arweave anchoring
+    struct StampedPlans {
+        string plansCID;
+        string specsCID;
+        string calcsCID;
+        string peLicense;
         uint256 lockedAt;
+        bool isLocked;
     }
 
-    struct PlanAmendment {
-        uint256 amendmentNumber;
-        string previousCID;
-        string newCID;
-        string reason;
-        address approvedBy;
-        uint256 approvedAt;
+    /// @notice FIX #3: Compliance scoring for AGI reasoning
+    struct ComplianceMeta {
+        uint8 score;            // 0-100
+        RiskLevel risk;
+        string[] flags;         // e.g., ["Missing setback", "Zoning variance needed"]
+        uint256 scoredAt;
+        address scoredBy;       // AI oracle or official
     }
 
-    struct FeeScheduleEntry {
-        PrimaryPermitType permitType;
-        uint256 baseFee;              // 6 decimals (USDC)
-        uint256 perSqFtFee;           // 6 decimals per sq ft
-        uint256 planReviewPercent;    // Basis points (6500 = 65%)
-        uint256 minimumFee;           // 6 decimals
-        uint256 maximumFee;           // 6 decimals (0 = no max)
+    /// @notice FIX #4: Production-grade inspection
+    struct Inspection {
+        uint256 id;
+        InspectionType inspectionType;
+        InspectionResult result;
+        address inspector;
+        uint256 scheduledAt;
+        uint256 completedAt;
+        string notes;
+        string[] photoCIDs;
+        string[] corrections;   // Required fixes if failed
     }
 
-    struct TradeFeeEntry {
-        TradePermitType tradeType;
-        uint256 baseFee;              // 6 decimals
-        uint256 perFixtureFee;        // Per outlet/fixture
-        uint256 minimumFee;
-    }
-
-    struct PaymentRecord {
-        uint256 paymentId;
-        uint256 permitId;
-        uint256 amount;               // 6 decimals
-        string paymentType;           // APPLICATION, PERMIT, TRADE, INSPECTION
-        bytes32 receiptHash;          // Keccak256 of receipt data
-        address paidBy;
+    /// @notice FIX #5: Stripe/smart-contract financial layer
+    struct FinancialMilestone {
+        uint256 fee;                    // Permit fee (6 decimals USDC)
+        uint256 escrowAmount;           // Held in escrow
+        MilestoneTrigger releaseOn;     // When to release escrow
+        bool feePaid;
+        bool escrowReleased;
         uint256 paidAt;
-        bool isRefunded;
-        uint256 refundedAt;
-        string refundReason;
+        uint256 releasedAt;
+        bytes32 stripePaymentId;        // Off-chain Stripe reference
+        bytes32 receiptHash;            // On-chain receipt proof
     }
 
+    /// @notice Primary permit (building permit)
     struct PrimaryPermit {
-        uint256 permitId;
+        uint256 id;
         bytes32 municipalityId;
-        PrimaryPermitType permitType;
-        ApprovalPhase phase;
-        PropertyRecord property;
+        Jurisdiction jurisdiction;
+        PrimaryType permitType;
+        PrimaryPhase phase;
 
-        // Applicant info
+        // Property & applicant
+        PropertyRecord property;
         address applicant;
         address propertyOwner;
-        string contractorLicense;     // Required for most work
+        string contractorLicense;
 
-        // Project details
-        string projectDescription;
-        uint256 estimatedCost;        // 6 decimals
-        uint256 grossSquareFootage;
-        uint8 numberOfStories;
-        string useGroup;              // A, B, E, F, H, I, M, R, S, U per 780 CMR
-        string constructionType;      // I-A through V-B
+        // Project
+        string description;
+        uint256 estimatedCost;
+        uint256 squareFootage;
+        string useGroup;
+        string constructionType;
 
-        // Stamped plans (immutable after approval)
-        StampedPlanSet plans;
-        PlanAmendment[] amendments;
+        // Plans (immutable after lock)
+        StampedPlans plans;
 
-        // Fees
-        uint256 applicationFee;
-        uint256 permitFee;
-        uint256 totalPaid;
+        // FIX #3: AI compliance
+        ComplianceMeta compliance;
+
+        // FIX #5: Financials
+        FinancialMilestone financials;
 
         // Timestamps
         uint256 submittedAt;
-        uint256 zoningApprovedAt;
-        uint256 planApprovedAt;
-        uint256 permitIssuedAt;
+        uint256 issuedAt;
         uint256 expiresAt;
-        uint256 completedAt;
+        uint256 finaledAt;
+        uint256 lastActivityAt;
 
-        // Linked permits
+        // Linked trades
         uint256[] tradePermitIds;
         bool requiresTradePermits;
 
         // State review
-        bool requiresStateReview;     // Projects >$50M or special hazards
+        bool requiresStateReview;
         bool stateApproved;
     }
 
+    /// @notice Trade permit (electrical, plumbing, etc.)
     struct TradePermit {
-        uint256 tradePermitId;
-        uint256 parentPermitId;       // Links to primary permit
-        TradePermitType tradeType;
-        ApprovalPhase phase;
+        uint256 id;
+        uint256 primaryId;          // Parent permit reference
+        TradeType tradeType;
+        TradePhase phase;
 
         // Licensed tradesperson
-        address licensedTradesperson;
-        string tradePersonLicense;
+        address contractor;
+        string contractorLicense;
 
         // Scope
-        string workDescription;
-        uint256 fixtureCount;         // Outlets, fixtures, BTU, etc.
+        string scope;
+        uint256 fixtureCount;
         uint256 estimatedCost;
 
-        // Fees
-        uint256 permitFee;
-        uint256 totalPaid;
+        // FIX #4: Inspections
+        Inspection[] inspections;
+
+        // FIX #5: Financials
+        FinancialMilestone financials;
+
+        // FIX #3: AI compliance
+        ComplianceMeta compliance;
 
         // Timestamps
         uint256 submittedAt;
-        uint256 approvedAt;
-        uint256 expiresAt;
-        uint256 completedAt;
+        uint256 issuedAt;
+        uint256 finaledAt;
 
-        // Inspector assignment
+        // Assigned inspector
         address assignedInspector;
-    }
-
-    struct Inspection {
-        uint256 inspectionId;
-        uint256 permitId;
-        bool isTradePermit;           // true = trade permit, false = primary
-        InspectionCategory category;
-
-        address scheduledBy;
-        address assignedInspector;
-        uint256 scheduledDate;
-        uint256 completedDate;
-
-        bool passed;
-        string resultCode;            // PASS, FAIL, PARTIAL, REINSPECT
-        string notes;
-        string[] photoCIDs;           // IPFS CIDs of inspection photos
-
-        // For failed inspections
-        string[] corrections;
-        uint256 reinspectionDeadline;
     }
 
     struct CertificateOfOccupancy {
-        uint256 coId;
+        uint256 id;
         uint256 permitId;
-        bytes32 municipalityId;
-        string coNumber;              // Official C/O number
-        string occupancyType;         // Use group
+        string coNumber;
+        string occupancyType;
         uint256 maxOccupancy;
         bool isTemporary;
-        uint256 temporaryExpiresAt;
+        uint256 expiresAt;
         address issuedBy;
         uint256 issuedAt;
-        string coCID;                 // IPFS CID of signed C/O document
+        string coCID;
     }
 
     // ============ State Variables ============
 
-    // USDC token for payments (Ethereum mainnet: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)
     IERC20 public immutable usdc;
-
-    // Counters
-    uint256 private _permitIdCounter = 1;
-    uint256 private _tradePermitIdCounter = 1;
-    uint256 private _inspectionIdCounter = 1;
-    uint256 private _paymentIdCounter = 1;
-    uint256 private _coIdCounter = 1;
-
-    // State treasury
     address public stateTreasury;
-    uint256 public stateFeePercent = 500;  // 5% to state (basis points)
+    uint256 public stateFeePercent = 500; // 5%
 
-    // Permit validity periods
-    uint256 public constant PERMIT_VALIDITY_PERIOD = 365 days;
-    uint256 public constant PERMIT_INACTIVITY_EXPIRY = 180 days;
-    uint256 public constant MAX_EXTENSION_PERIOD = 180 days;
+    uint256 private _permitCounter = 1;
+    uint256 private _tradeCounter = 1;
+    uint256 private _inspectionCounter = 1;
+    uint256 private _coCounter = 1;
 
-    // State review threshold (per 780 CMR 107.1.1)
-    uint256 public stateReviewThreshold = 50_000_000 * 10**6; // $50M in USDC decimals
+    uint256 public constant PERMIT_VALIDITY = 365 days;
+    uint256 public constant INACTIVITY_EXPIRY = 180 days;
+    uint256 public stateReviewThreshold = 50_000_000 * 10**6;
 
-    // ============ Mappings ============
-
-    // Municipality registry
+    // Mappings
     mapping(bytes32 => Municipality) public municipalities;
     bytes32[] public municipalityList;
 
-    // Jurisdiction grants (address => municipalityId => role => grant)
-    mapping(address => mapping(bytes32 => mapping(bytes32 => JurisdictionGrant))) public jurisdictionGrants;
-
-    // License registry
+    mapping(address => mapping(bytes32 => mapping(bytes32 => JurisdictionGrant))) public jurisdictions;
     mapping(address => License) public licenses;
-    mapping(string => address) public licenseNumberToAddress;
+    mapping(string => address) public licenseRegistry;
 
-    // Permits
     mapping(uint256 => PrimaryPermit) public permits;
     mapping(uint256 => TradePermit) public tradePermits;
-    mapping(uint256 => Inspection[]) public permitInspections;
-    mapping(uint256 => PaymentRecord[]) public permitPayments;
-    mapping(uint256 => CertificateOfOccupancy) public certificatesOfOccupancy;
+    mapping(uint256 => CertificateOfOccupancy) public certificates;
 
-    // Fee schedules (municipalityId => permitType => fee entry)
-    mapping(bytes32 => mapping(PrimaryPermitType => FeeScheduleEntry)) public feeSchedules;
-    mapping(bytes32 => mapping(TradePermitType => TradeFeeEntry)) public tradeFeeSchedules;
-
-    // Lookups
     mapping(address => uint256[]) public applicantPermits;
     mapping(bytes32 => uint256[]) public municipalityPermits;
-    mapping(string => uint256[]) public parcelPermitHistory;  // All permits for a parcel
 
     // ============ Events ============
 
-    event MunicipalityRegistered(bytes32 indexed id, string name, uint16 townCode);
-    event MunicipalityUpdated(bytes32 indexed id);
-
+    event MunicipalityRegistered(bytes32 indexed id, string name, Jurisdiction jurisdiction);
     event JurisdictionGranted(address indexed official, bytes32 indexed municipalityId, bytes32 role);
-    event JurisdictionRevoked(address indexed official, bytes32 indexed municipalityId, bytes32 role);
+    event LicenseRegistered(address indexed holder, string licenseNumber);
 
-    event LicenseRegistered(address indexed holder, string licenseNumber, string licenseType);
-    event LicenseSuspended(address indexed holder, string reason);
-    event LicenseReinstated(address indexed holder);
+    event PrimaryPermitCreated(uint256 indexed id, bytes32 indexed municipalityId, PrimaryType permitType);
+    event PrimaryPhaseChanged(uint256 indexed id, PrimaryPhase from, PrimaryPhase to, address by);
+    event PlansLocked(uint256 indexed id, string plansCID);
 
-    event PermitApplicationSubmitted(uint256 indexed permitId, bytes32 indexed municipalityId, address indexed applicant);
-    event PermitPhaseChanged(uint256 indexed permitId, ApprovalPhase previousPhase, ApprovalPhase newPhase, address changedBy);
-    event ZoningApproved(uint256 indexed permitId, address approvedBy);
-    event ZoningVarianceRequired(uint256 indexed permitId, string reason);
-    event PlansSubmitted(uint256 indexed permitId, string plansCID);
-    event PlansLocked(uint256 indexed permitId, string plansCID, uint256 lockedAt);
-    event PlanAmendmentApproved(uint256 indexed permitId, uint256 amendmentNumber, string newCID);
-    event PermitApproved(uint256 indexed permitId, address approvedBy);
-    event PermitIssued(uint256 indexed permitId, uint256 expiresAt);
-    event PermitExtended(uint256 indexed permitId, uint256 newExpiresAt);
-    event PermitSuspended(uint256 indexed permitId, string reason);
-    event PermitRevoked(uint256 indexed permitId, string reason);
-    event PermitVoided(uint256 indexed permitId, uint256 refundAmount);
+    event TradePermitCreated(uint256 indexed id, uint256 indexed primaryId, TradeType tradeType);
+    event TradePhaseChanged(uint256 indexed id, TradePhase from, TradePhase to, address by);
 
-    event TradePermitSubmitted(uint256 indexed tradePermitId, uint256 indexed parentPermitId, TradePermitType tradeType);
-    event TradePermitApproved(uint256 indexed tradePermitId, address approvedBy);
-    event TradePermitCompleted(uint256 indexed tradePermitId);
+    event InspectionScheduled(uint256 indexed permitId, uint256 inspectionId, InspectionType inspectionType);
+    event InspectionCompleted(uint256 indexed permitId, uint256 inspectionId, InspectionResult result);
 
-    event InspectionScheduled(uint256 indexed inspectionId, uint256 indexed permitId, InspectionCategory category);
-    event InspectionCompleted(uint256 indexed inspectionId, bool passed, string resultCode);
-    event InspectionFailed(uint256 indexed inspectionId, string[] corrections);
+    event ComplianceScored(uint256 indexed permitId, uint8 score, RiskLevel risk);
+    event PaymentReceived(uint256 indexed permitId, uint256 amount, bytes32 receiptHash);
+    event EscrowReleased(uint256 indexed permitId, uint256 amount, MilestoneTrigger trigger);
 
-    event PaymentReceived(uint256 indexed paymentId, uint256 indexed permitId, uint256 amount, string paymentType);
-    event RefundIssued(uint256 indexed paymentId, uint256 amount, string reason);
+    event COIssued(uint256 indexed coId, uint256 indexed permitId, string coNumber);
 
-    event CertificateOfOccupancyIssued(uint256 indexed coId, uint256 indexed permitId, string coNumber);
+    // FIX #6: Voice status events
+    event VoiceStatus(uint256 indexed permitId, string message);
 
-    event FeeScheduleUpdated(bytes32 indexed municipalityId, PrimaryPermitType permitType);
-    event TradeFeeScheduleUpdated(bytes32 indexed municipalityId, TradePermitType tradeType);
+    // ============ Errors (Gas-Efficient) ============
+
+    error NotAuthorized();
+    error InvalidPhase();
+    error InvalidDependency();
+    error LicenseInvalid();
+    error InsufficientPayment();
+    error PlansLocked();
+    error MunicipalityInactive();
+    error PrimaryNotIssued();
+    error TradeNotEligible();
 
     // ============ Modifiers ============
 
-    modifier onlyStateOfficial() {
-        require(
-            hasRole(STATE_BUILDING_COMMISSIONER, msg.sender) ||
-            hasRole(STATE_FIRE_MARSHAL, msg.sender) ||
-            hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
-            "Not a state official"
-        );
+    modifier onlyState() {
+        if (!hasRole(STATE_COMMISSIONER, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender))
+            revert NotAuthorized();
         _;
     }
 
-    modifier onlyJurisdiction(bytes32 _municipalityId, bytes32 _role) {
-        require(
-            _hasJurisdiction(msg.sender, _municipalityId, _role) ||
-            hasRole(STATE_BUILDING_COMMISSIONER, msg.sender) ||
-            hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
-            "No jurisdiction for this action"
-        );
+    modifier onlyJurisdiction(bytes32 _muniId, bytes32 _role) {
+        if (!_hasJurisdiction(msg.sender, _muniId, _role) &&
+            !hasRole(STATE_COMMISSIONER, msg.sender) &&
+            !hasRole(DEFAULT_ADMIN_ROLE, msg.sender))
+            revert NotAuthorized();
         _;
     }
 
-    modifier onlyLicensed(bytes32 _licenseType) {
-        require(
-            licenses[msg.sender].isActive &&
-            !licenses[msg.sender].isSuspended &&
-            licenses[msg.sender].expiresAt > block.timestamp,
-            "Valid license required"
-        );
+    modifier primaryExists(uint256 _id) {
+        require(permits[_id].id != 0, "Primary not found");
         _;
     }
 
-    modifier permitExists(uint256 _permitId) {
-        require(permits[_permitId].permitId != 0, "Permit not found");
-        _;
-    }
-
-    modifier tradePermitExists(uint256 _tradePermitId) {
-        require(tradePermits[_tradePermitId].tradePermitId != 0, "Trade permit not found");
+    modifier tradeExists(uint256 _id) {
+        require(tradePermits[_id].id != 0, "Trade not found");
         _;
     }
 
     // ============ Constructor ============
 
-    constructor(address _usdc, address _stateTreasury) {
-        require(_usdc != address(0), "Invalid USDC address");
-        require(_stateTreasury != address(0), "Invalid state treasury");
-
+    constructor(address _usdc, address _treasury) {
+        require(_usdc != address(0) && _treasury != address(0), "Invalid address");
         usdc = IERC20(_usdc);
-        stateTreasury = _stateTreasury;
-
+        stateTreasury = _treasury;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(STATE_BUILDING_COMMISSIONER, msg.sender);
+        _grantRole(STATE_COMMISSIONER, msg.sender);
+    }
+
+    // ============ FIX #2: Deterministic Dependency Logic ============
+
+    /**
+     * @notice Check if primary permit is in a state that allows trade permits
+     * @dev Trade permits can ONLY proceed if primary is ISSUED or later (not expired/revoked)
+     */
+    function isPrimaryEligibleForTrades(uint256 _primaryId) public view returns (bool) {
+        PrimaryPermit storage p = permits[_primaryId];
+        if (p.id == 0) return false;
+
+        // Only these phases allow trade permit activity
+        return p.phase == PrimaryPhase.Issued ||
+               p.phase == PrimaryPhase.Active ||
+               p.phase == PrimaryPhase.FinalInspection;
+    }
+
+    /**
+     * @notice Check if a specific trade type can be submitted for a primary
+     * @dev Deterministic check - no guessing, no hallucination
+     */
+    function isTradeEligible(
+        uint256 _primaryId,
+        TradeType _tradeType
+    ) public view returns (bool eligible, string memory reason) {
+        PrimaryPermit storage p = permits[_primaryId];
+
+        if (p.id == 0) {
+            return (false, "Primary permit does not exist");
+        }
+
+        if (p.phase != PrimaryPhase.Issued &&
+            p.phase != PrimaryPhase.Active &&
+            p.phase != PrimaryPhase.FinalInspection) {
+            return (false, "Primary permit is not issued");
+        }
+
+        if (p.phase == PrimaryPhase.Expired) {
+            return (false, "Primary permit has expired");
+        }
+
+        if (p.phase == PrimaryPhase.Revoked) {
+            return (false, "Primary permit has been revoked");
+        }
+
+        if (p.phase == PrimaryPhase.Suspended) {
+            return (false, "Primary permit is suspended - stop work order in effect");
+        }
+
+        // Check if this trade type already has a finaled permit
+        for (uint i = 0; i < p.tradePermitIds.length; i++) {
+            TradePermit storage t = tradePermits[p.tradePermitIds[i]];
+            if (t.tradeType == _tradeType && t.phase == TradePhase.Finaled) {
+                return (false, "Trade permit of this type already finaled");
+            }
+        }
+
+        return (true, "Eligible");
+    }
+
+    /**
+     * @notice Check if inspection can proceed
+     */
+    function canScheduleInspection(uint256 _tradeId) public view returns (bool eligible, string memory reason) {
+        TradePermit storage t = tradePermits[_tradeId];
+
+        if (t.id == 0) {
+            return (false, "Trade permit does not exist");
+        }
+
+        if (t.phase == TradePhase.Pending || t.phase == TradePhase.Submitted) {
+            return (false, "Trade permit not yet issued");
+        }
+
+        if (t.phase == TradePhase.Finaled) {
+            return (false, "Trade permit already finaled");
+        }
+
+        if (t.phase == TradePhase.Voided || t.phase == TradePhase.Rejected) {
+            return (false, "Trade permit is voided or rejected");
+        }
+
+        // Check primary is still valid
+        if (!isPrimaryEligibleForTrades(t.primaryId)) {
+            return (false, "Parent primary permit is not active");
+        }
+
+        return (true, "Eligible for inspection");
+    }
+
+    /**
+     * @notice Check if payment can be released (escrow)
+     */
+    function canReleasePayment(uint256 _tradeId) public view returns (bool) {
+        TradePermit storage t = tradePermits[_tradeId];
+        if (t.id == 0) return false;
+        if (t.financials.escrowReleased) return false;
+        if (t.financials.escrowAmount == 0) return false;
+
+        if (t.financials.releaseOn == MilestoneTrigger.OnInspectionPass) {
+            // Check if any inspection passed
+            for (uint i = 0; i < t.inspections.length; i++) {
+                if (t.inspections[i].result == InspectionResult.Passed) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        if (t.financials.releaseOn == MilestoneTrigger.OnFinaled) {
+            return t.phase == TradePhase.Finaled;
+        }
+
+        return false;
+    }
+
+    // ============ FIX #6: Voice-Optimized Status Output ============
+
+    /**
+     * @notice Get deterministic voice summary for primary permit
+     * @dev Prevents speculative AGI speech - avatar becomes reliable
+     */
+    function getVoiceSummary(uint256 _primaryId) external view returns (string memory) {
+        PrimaryPermit storage p = permits[_primaryId];
+
+        if (p.id == 0) {
+            return "Permit not found.";
+        }
+
+        // Draft phase
+        if (p.phase == PrimaryPhase.Draft) {
+            return "Application is in draft status. Submit to begin review.";
+        }
+
+        // Submitted/Review phases
+        if (p.phase == PrimaryPhase.Submitted || p.phase == PrimaryPhase.ZoningReview) {
+            return "Application is under review. Awaiting zoning clearance.";
+        }
+
+        if (p.phase == PrimaryPhase.PlanReview) {
+            return "Plans are under technical review by the building department.";
+        }
+
+        // Approved but not issued
+        if (p.phase == PrimaryPhase.Approved) {
+            return "Permit approved. Pay fees to receive permit card.";
+        }
+
+        // Issued - check trades
+        if (p.phase == PrimaryPhase.Issued || p.phase == PrimaryPhase.Active) {
+            uint256 openTrades = 0;
+            uint256 totalTrades = p.tradePermitIds.length;
+
+            for (uint i = 0; i < totalTrades; i++) {
+                TradePermit storage t = tradePermits[p.tradePermitIds[i]];
+                if (t.phase != TradePhase.Finaled) {
+                    openTrades++;
+                }
+            }
+
+            if (totalTrades == 0) {
+                return "Primary permit issued. No trade permits on file.";
+            }
+
+            if (openTrades == 0) {
+                return "All trade permits finalized. Eligible for final inspection.";
+            }
+
+            // Return count (can't concatenate strings efficiently in Solidity)
+            return "Primary permit issued. Trade permits in progress.";
+        }
+
+        // Final inspection
+        if (p.phase == PrimaryPhase.FinalInspection) {
+            return "Final building inspection phase. Schedule final inspection to close out.";
+        }
+
+        // Finaled
+        if (p.phase == PrimaryPhase.Finaled) {
+            return "Project complete. Certificate of Occupancy issued.";
+        }
+
+        // Problem states
+        if (p.phase == PrimaryPhase.Expired) {
+            return "Permit expired due to inactivity. Renewal required.";
+        }
+
+        if (p.phase == PrimaryPhase.Revoked) {
+            return "Permit has been revoked. Contact building department.";
+        }
+
+        if (p.phase == PrimaryPhase.Suspended) {
+            return "Stop work order in effect. All work must cease immediately.";
+        }
+
+        return "Status unknown.";
+    }
+
+    /**
+     * @notice Get trade permit voice summary
+     */
+    function getTradeVoiceSummary(uint256 _tradeId) external view returns (string memory) {
+        TradePermit storage t = tradePermits[_tradeId];
+
+        if (t.id == 0) return "Trade permit not found.";
+
+        if (t.phase == TradePhase.Pending) return "Trade permit pending submission.";
+        if (t.phase == TradePhase.Submitted) return "Trade permit under review.";
+        if (t.phase == TradePhase.Issued) return "Trade permit issued. Ready for rough inspection.";
+        if (t.phase == TradePhase.RoughScheduled) return "Rough inspection scheduled.";
+        if (t.phase == TradePhase.RoughPassed) return "Rough inspection passed. Ready for final.";
+        if (t.phase == TradePhase.RoughFailed) return "Rough inspection failed. Corrections required.";
+        if (t.phase == TradePhase.FinalScheduled) return "Final inspection scheduled.";
+        if (t.phase == TradePhase.Inspected) return "Inspections complete. Awaiting signoff.";
+        if (t.phase == TradePhase.Finaled) return "Trade permit finaled. Work complete.";
+        if (t.phase == TradePhase.Rejected) return "Trade permit rejected.";
+        if (t.phase == TradePhase.Voided) return "Trade permit voided.";
+
+        return "Status unknown.";
     }
 
     // ============ Jurisdiction Management ============
 
-    function _hasJurisdiction(
-        address _official,
-        bytes32 _municipalityId,
-        bytes32 _role
-    ) internal view returns (bool) {
-        JurisdictionGrant storage grant = jurisdictionGrants[_official][_municipalityId][_role];
-        if (!grant.isActive) return false;
-        if (grant.expiresAt != 0 && grant.expiresAt < block.timestamp) return false;
+    function _hasJurisdiction(address _addr, bytes32 _muniId, bytes32 _role) internal view returns (bool) {
+        JurisdictionGrant storage g = jurisdictions[_addr][_muniId][_role];
+        if (!g.isActive) return false;
+        if (g.expiresAt != 0 && g.expiresAt < block.timestamp) return false;
         return true;
     }
 
-    /**
-     * @notice Grant jurisdiction to an official for a specific municipality and role
-     * @param _official Official's address
-     * @param _municipalityId Municipality identifier
-     * @param _role Role to grant (BUILDING_OFFICIAL, ELECTRICAL_INSPECTOR, etc.)
-     * @param _expiresAt Expiration timestamp (0 = no expiry)
-     */
     function grantJurisdiction(
         address _official,
-        bytes32 _municipalityId,
+        bytes32 _muniId,
         bytes32 _role,
         uint256 _expiresAt
-    ) external onlyStateOfficial {
-        require(_official != address(0), "Invalid official address");
-        require(municipalities[_municipalityId].isActive, "Municipality not active");
-
-        jurisdictionGrants[_official][_municipalityId][_role] = JurisdictionGrant({
-            municipalityId: _municipalityId,
+    ) external onlyState {
+        jurisdictions[_official][_muniId][_role] = JurisdictionGrant({
+            municipalityId: _muniId,
             role: _role,
-            grantedAt: block.timestamp,
             expiresAt: _expiresAt,
             isActive: true
         });
-
-        emit JurisdictionGranted(_official, _municipalityId, _role);
-    }
-
-    /**
-     * @notice Revoke jurisdiction from an official
-     */
-    function revokeJurisdiction(
-        address _official,
-        bytes32 _municipalityId,
-        bytes32 _role
-    ) external onlyStateOfficial {
-        jurisdictionGrants[_official][_municipalityId][_role].isActive = false;
-        emit JurisdictionRevoked(_official, _municipalityId, _role);
+        emit JurisdictionGranted(_official, _muniId, _role);
     }
 
     // ============ Municipality Management ============
 
-    /**
-     * @notice Register a Massachusetts municipality
-     * @param _name Municipality name
-     * @param _county MA county name
-     * @param _townCode MA DOR town code (1-351)
-     * @param _treasury USDC treasury address
-     */
     function registerMunicipality(
         string calldata _name,
-        string calldata _county,
         uint16 _townCode,
-        address _treasury
-    ) external onlyStateOfficial {
-        require(_treasury != address(0), "Invalid treasury");
-        require(_townCode >= 1 && _townCode <= 351, "Invalid MA town code");
-
+        address _treasury,
+        Jurisdiction _jurisdiction
+    ) external onlyState {
         bytes32 id = keccak256(abi.encodePacked(_name, _townCode));
-        require(municipalities[id].createdAt == 0, "Municipality exists");
+        require(municipalities[id].townCode == 0, "Exists");
 
         municipalities[id] = Municipality({
             id: id,
             name: _name,
-            maCounty: _county,
             townCode: _townCode,
             treasury: _treasury,
-            buildingDepartment: _treasury,
-            acceptsOnlinePermits: true,
+            jurisdiction: _jurisdiction,
             isActive: true,
-            totalRevenue: 0,
             permitsIssued: 0,
-            createdAt: block.timestamp
+            totalRevenue: 0
         });
 
         municipalityList.push(id);
-        emit MunicipalityRegistered(id, _name, _townCode);
+        emit MunicipalityRegistered(id, _name, _jurisdiction);
     }
 
-    /**
-     * @notice Update municipality settings
-     */
-    function updateMunicipality(
-        bytes32 _id,
-        address _treasury,
-        address _buildingDepartment,
-        bool _acceptsOnlinePermits,
-        bool _isActive
-    ) external onlyStateOfficial {
-        require(municipalities[_id].createdAt != 0, "Municipality not found");
+    // ============ License Management ============
 
-        Municipality storage m = municipalities[_id];
-        m.treasury = _treasury;
-        m.buildingDepartment = _buildingDepartment;
-        m.acceptsOnlinePermits = _acceptsOnlinePermits;
-        m.isActive = _isActive;
-
-        emit MunicipalityUpdated(_id);
-    }
-
-    // ============ License Registry ============
-
-    /**
-     * @notice Register a professional license
-     * @param _holder License holder's wallet
-     * @param _licenseNumber Official license number
-     * @param _licenseType Type (CSL, HIC, Master Electrician, Journeyman Plumber, etc.)
-     * @param _ensName ENS name for DID verification
-     * @param _issuingAuthority Issuing state board
-     * @param _expiresAt License expiration
-     */
     function registerLicense(
         address _holder,
-        string calldata _licenseNumber,
-        string calldata _licenseType,
-        string calldata _ensName,
-        bytes32 _issuingAuthority,
+        string calldata _number,
+        string calldata _type,
         uint256 _expiresAt
-    ) external onlyStateOfficial {
-        require(_holder != address(0), "Invalid holder");
-        require(licenseNumberToAddress[_licenseNumber] == address(0), "License number exists");
+    ) external onlyState {
+        require(licenseRegistry[_number] == address(0), "License exists");
 
         licenses[_holder] = License({
             holder: _holder,
-            licenseNumber: _licenseNumber,
-            licenseType: _licenseType,
-            ensName: _ensName,
-            issuingAuthority: _issuingAuthority,
-            issuedAt: block.timestamp,
+            licenseNumber: _number,
+            licenseType: _type,
             expiresAt: _expiresAt,
             isActive: true,
             isSuspended: false
         });
 
-        licenseNumberToAddress[_licenseNumber] = _holder;
-
-        // Grant appropriate role based on license type
-        if (keccak256(bytes(_licenseType)) == keccak256("CSL") ||
-            keccak256(bytes(_licenseType)) == keccak256("HIC")) {
-            _grantRole(LICENSED_CONTRACTOR, _holder);
-        } else if (keccak256(bytes(_licenseType)) == keccak256("Master Electrician") ||
-                   keccak256(bytes(_licenseType)) == keccak256("Journeyman Electrician")) {
-            _grantRole(LICENSED_ELECTRICIAN, _holder);
-        } else if (keccak256(bytes(_licenseType)) == keccak256("Master Plumber") ||
-                   keccak256(bytes(_licenseType)) == keccak256("Journeyman Plumber")) {
-            _grantRole(LICENSED_PLUMBER, _holder);
-        } else if (keccak256(bytes(_licenseType)) == keccak256("Gas Fitter")) {
-            _grantRole(LICENSED_GAS_FITTER, _holder);
-        }
-
-        emit LicenseRegistered(_holder, _licenseNumber, _licenseType);
+        licenseRegistry[_number] = _holder;
+        emit LicenseRegistered(_holder, _number);
     }
 
-    /**
-     * @notice Suspend a license
-     */
-    function suspendLicense(address _holder, string calldata _reason) external onlyStateOfficial {
-        licenses[_holder].isSuspended = true;
-        emit LicenseSuspended(_holder, _reason);
-    }
+    // ============ Primary Permit Lifecycle ============
 
-    /**
-     * @notice Reinstate a suspended license
-     */
-    function reinstateLicense(address _holder) external onlyStateOfficial {
-        licenses[_holder].isSuspended = false;
-        emit LicenseReinstated(_holder);
-    }
-
-    // ============ Fee Schedule Management ============
-
-    /**
-     * @notice Set fee schedule for a municipality
-     */
-    function setFeeSchedule(
-        bytes32 _municipalityId,
-        PrimaryPermitType _permitType,
-        uint256 _baseFee,
-        uint256 _perSqFtFee,
-        uint256 _planReviewPercent,
-        uint256 _minimumFee,
-        uint256 _maximumFee
-    ) external onlyJurisdiction(_municipalityId, MUNICIPAL_CLERK) {
-        feeSchedules[_municipalityId][_permitType] = FeeScheduleEntry({
-            permitType: _permitType,
-            baseFee: _baseFee,
-            perSqFtFee: _perSqFtFee,
-            planReviewPercent: _planReviewPercent,
-            minimumFee: _minimumFee,
-            maximumFee: _maximumFee
-        });
-
-        emit FeeScheduleUpdated(_municipalityId, _permitType);
-    }
-
-    /**
-     * @notice Set trade permit fee schedule
-     */
-    function setTradeFeeSchedule(
-        bytes32 _municipalityId,
-        TradePermitType _tradeType,
-        uint256 _baseFee,
-        uint256 _perFixtureFee,
-        uint256 _minimumFee
-    ) external onlyJurisdiction(_municipalityId, MUNICIPAL_CLERK) {
-        tradeFeeSchedules[_municipalityId][_tradeType] = TradeFeeEntry({
-            tradeType: _tradeType,
-            baseFee: _baseFee,
-            perFixtureFee: _perFixtureFee,
-            minimumFee: _minimumFee
-        });
-
-        emit TradeFeeScheduleUpdated(_municipalityId, _tradeType);
-    }
-
-    // ============ Primary Permit Application ============
-
-    /**
-     * @notice Submit a new building permit application
-     * @dev Sequential workflow: Zoning → Plan Review → Approval → Fee Payment → Issuance
-     */
-    function submitPermitApplication(
-        bytes32 _municipalityId,
-        PrimaryPermitType _permitType,
+    function submitPrimaryPermit(
+        bytes32 _muniId,
+        PrimaryType _type,
         PropertyRecord calldata _property,
         address _propertyOwner,
         string calldata _contractorLicense,
-        string calldata _projectDescription,
+        string calldata _description,
         uint256 _estimatedCost,
-        uint256 _grossSquareFootage,
-        uint8 _numberOfStories,
+        uint256 _squareFootage,
         string calldata _useGroup,
         string calldata _constructionType
     ) external nonReentrant whenNotPaused returns (uint256) {
-        require(municipalities[_municipalityId].isActive, "Municipality not active");
-        require(municipalities[_municipalityId].acceptsOnlinePermits, "Online permits not accepted");
-        require(_propertyOwner != address(0), "Invalid property owner");
+        Municipality storage m = municipalities[_muniId];
+        if (!m.isActive) revert MunicipalityInactive();
 
-        // Verify contractor license if required
-        if (_permitType != PrimaryPermitType.DEMOLITION_FULL &&
-            _permitType != PrimaryPermitType.DEMOLITION_PARTIAL) {
-            address contractor = licenseNumberToAddress[_contractorLicense];
-            require(
-                licenses[contractor].isActive && !licenses[contractor].isSuspended,
-                "Valid contractor license required"
-            );
+        // Validate contractor license
+        address contractor = licenseRegistry[_contractorLicense];
+        License storage lic = licenses[contractor];
+        if (!lic.isActive || lic.isSuspended || lic.expiresAt < block.timestamp) {
+            revert LicenseInvalid();
         }
 
-        // Calculate application fee
-        FeeScheduleEntry storage feeEntry = feeSchedules[_municipalityId][_permitType];
-        uint256 applicationFee = _calculateApplicationFee(_municipalityId, _permitType);
+        uint256 id = _permitCounter++;
 
-        // Collect application fee
-        require(usdc.balanceOf(msg.sender) >= applicationFee, "Insufficient USDC balance");
-        _collectPayment(msg.sender, _municipalityId, applicationFee);
+        permits[id].id = id;
+        permits[id].municipalityId = _muniId;
+        permits[id].jurisdiction = m.jurisdiction;
+        permits[id].permitType = _type;
+        permits[id].phase = PrimaryPhase.Submitted;
+        permits[id].property = _property;
+        permits[id].applicant = msg.sender;
+        permits[id].propertyOwner = _propertyOwner;
+        permits[id].contractorLicense = _contractorLicense;
+        permits[id].description = _description;
+        permits[id].estimatedCost = _estimatedCost;
+        permits[id].squareFootage = _squareFootage;
+        permits[id].useGroup = _useGroup;
+        permits[id].constructionType = _constructionType;
+        permits[id].submittedAt = block.timestamp;
+        permits[id].lastActivityAt = block.timestamp;
+        permits[id].requiresStateReview = _estimatedCost >= stateReviewThreshold;
+        permits[id].requiresTradePermits = _requiresTradePermits(_type);
 
-        uint256 permitId = _permitIdCounter++;
+        applicantPermits[msg.sender].push(id);
+        municipalityPermits[_muniId].push(id);
 
-        permits[permitId].permitId = permitId;
-        permits[permitId].municipalityId = _municipalityId;
-        permits[permitId].permitType = _permitType;
-        permits[permitId].phase = ApprovalPhase.ZONING_REVIEW;
-        permits[permitId].property = _property;
-        permits[permitId].applicant = msg.sender;
-        permits[permitId].propertyOwner = _propertyOwner;
-        permits[permitId].contractorLicense = _contractorLicense;
-        permits[permitId].projectDescription = _projectDescription;
-        permits[permitId].estimatedCost = _estimatedCost;
-        permits[permitId].grossSquareFootage = _grossSquareFootage;
-        permits[permitId].numberOfStories = _numberOfStories;
-        permits[permitId].useGroup = _useGroup;
-        permits[permitId].constructionType = _constructionType;
-        permits[permitId].applicationFee = applicationFee;
-        permits[permitId].totalPaid = applicationFee;
-        permits[permitId].submittedAt = block.timestamp;
-        permits[permitId].requiresStateReview = _estimatedCost >= stateReviewThreshold;
-        permits[permitId].requiresTradePermits = _requiresTradePermits(_permitType);
+        emit PrimaryPermitCreated(id, _muniId, _type);
+        emit PrimaryPhaseChanged(id, PrimaryPhase.Draft, PrimaryPhase.Submitted, msg.sender);
 
-        // Record payment
-        _recordPayment(permitId, applicationFee, "APPLICATION");
-
-        // Add to lookups
-        applicantPermits[msg.sender].push(permitId);
-        municipalityPermits[_municipalityId].push(permitId);
-        parcelPermitHistory[_property.parcelId].push(permitId);
-
-        emit PermitApplicationSubmitted(permitId, _municipalityId, msg.sender);
-        emit PermitPhaseChanged(permitId, ApprovalPhase.DRAFT, ApprovalPhase.ZONING_REVIEW, msg.sender);
-
-        return permitId;
+        return id;
     }
 
-    // ============ Zoning Review ============
+    function advancePrimaryPhase(
+        uint256 _id,
+        PrimaryPhase _newPhase
+    ) external primaryExists(_id) onlyJurisdiction(permits[_id].municipalityId, BUILDING_OFFICIAL) {
+        PrimaryPermit storage p = permits[_id];
+        PrimaryPhase current = p.phase;
 
-    /**
-     * @notice Approve zoning for a permit application
-     */
-    function approveZoning(uint256 _permitId)
-        external
-        permitExists(_permitId)
-        onlyJurisdiction(permits[_permitId].municipalityId, ZONING_OFFICER)
-    {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(permit.phase == ApprovalPhase.ZONING_REVIEW, "Not in zoning review");
+        // FIX #8: Validation guards - enforce valid transitions
+        if (_newPhase == PrimaryPhase.ZoningReview) {
+            require(current == PrimaryPhase.Submitted, "Must be submitted");
+        } else if (_newPhase == PrimaryPhase.PlanReview) {
+            require(current == PrimaryPhase.ZoningReview, "Must have zoning review");
+        } else if (_newPhase == PrimaryPhase.Approved) {
+            require(current == PrimaryPhase.PlanReview, "Must be in plan review");
+            require(p.plans.isLocked, "Plans must be locked");
+        } else if (_newPhase == PrimaryPhase.Issued) {
+            require(current == PrimaryPhase.Approved, "Must be approved");
+            require(p.financials.feePaid, "Fees not paid");
+            if (p.requiresStateReview) {
+                require(p.stateApproved, "State approval required");
+            }
+            p.issuedAt = block.timestamp;
+            p.expiresAt = block.timestamp + PERMIT_VALIDITY;
+            municipalities[p.municipalityId].permitsIssued++;
+        }
 
-        ApprovalPhase previousPhase = permit.phase;
-        permit.phase = ApprovalPhase.ZONING_APPROVED;
-        permit.zoningApprovedAt = block.timestamp;
+        p.phase = _newPhase;
+        p.lastActivityAt = block.timestamp;
 
-        emit ZoningApproved(_permitId, msg.sender);
-        emit PermitPhaseChanged(_permitId, previousPhase, permit.phase, msg.sender);
+        emit PrimaryPhaseChanged(_id, current, _newPhase, msg.sender);
+        emit VoiceStatus(_id, "Permit status updated.");
     }
 
-    /**
-     * @notice Indicate zoning variance is required
-     */
-    function requireZoningVariance(uint256 _permitId, string calldata _reason)
-        external
-        permitExists(_permitId)
-        onlyJurisdiction(permits[_permitId].municipalityId, ZONING_OFFICER)
-    {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(permit.phase == ApprovalPhase.ZONING_REVIEW, "Not in zoning review");
-
-        permit.phase = ApprovalPhase.ZONING_VARIANCE_REQUIRED;
-
-        emit ZoningVarianceRequired(_permitId, _reason);
-        emit PermitPhaseChanged(_permitId, ApprovalPhase.ZONING_REVIEW, permit.phase, msg.sender);
-    }
-
-    // ============ Plan Submission & Locking ============
-
-    /**
-     * @notice Submit stamped construction plans
-     * @dev Plans must be submitted after zoning approval
-     * @param _permitId Permit identifier
-     * @param _plansCID IPFS/Arweave CID of construction plans
-     * @param _specsDocCID IPFS/Arweave CID of specifications
-     * @param _structuralCalcsCID IPFS/Arweave CID of structural calculations
-     * @param _energyComplianceCID IPFS/Arweave CID of energy compliance docs
-     * @param _peLicenseNumber License number of stamping PE/RA
-     */
-    function submitPlans(
-        uint256 _permitId,
+    function lockPlans(
+        uint256 _id,
         string calldata _plansCID,
-        string calldata _specsDocCID,
-        string calldata _structuralCalcsCID,
-        string calldata _energyComplianceCID,
-        string calldata _peLicenseNumber
-    ) external permitExists(_permitId) {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(
-            permit.phase == ApprovalPhase.ZONING_APPROVED ||
-            permit.phase == ApprovalPhase.PLAN_CORRECTIONS_NEEDED,
-            "Cannot submit plans in current phase"
-        );
-        require(
-            permit.applicant == msg.sender || permit.propertyOwner == msg.sender,
-            "Not authorized"
-        );
-        require(!permit.plans.isLocked, "Plans already locked");
-        require(bytes(_plansCID).length > 0, "Plans CID required");
+        string calldata _specsCID,
+        string calldata _calcsCID,
+        string calldata _peLicense
+    ) external primaryExists(_id) {
+        PrimaryPermit storage p = permits[_id];
+        require(p.applicant == msg.sender || p.propertyOwner == msg.sender, "Not authorized");
+        if (p.plans.isLocked) revert PlansLocked();
+        require(p.phase == PrimaryPhase.PlanReview, "Not in plan review");
 
-        permit.plans = StampedPlanSet({
+        p.plans = StampedPlans({
             plansCID: _plansCID,
-            specsDocCID: _specsDocCID,
-            structuralCalcsCID: _structuralCalcsCID,
-            energyComplianceCID: _energyComplianceCID,
-            stampedBy: msg.sender,
-            peLicenseNumber: _peLicenseNumber,
-            stampedAt: block.timestamp,
-            isLocked: false,
-            lockedAt: 0
+            specsCID: _specsCID,
+            calcsCID: _calcsCID,
+            peLicense: _peLicense,
+            lockedAt: block.timestamp,
+            isLocked: true
         });
 
-        permit.phase = ApprovalPhase.PLAN_REVIEW;
-
-        emit PlansSubmitted(_permitId, _plansCID);
-        emit PermitPhaseChanged(_permitId, ApprovalPhase.ZONING_APPROVED, permit.phase, msg.sender);
+        emit PlansLocked(_id, _plansCID);
     }
 
-    /**
-     * @notice Request plan corrections
-     */
-    function requestPlanCorrections(uint256 _permitId, string calldata _corrections)
-        external
-        permitExists(_permitId)
-        onlyJurisdiction(permits[_permitId].municipalityId, BUILDING_OFFICIAL)
-    {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(permit.phase == ApprovalPhase.PLAN_REVIEW, "Not in plan review");
-        require(!permit.plans.isLocked, "Plans already locked");
-
-        permit.phase = ApprovalPhase.PLAN_CORRECTIONS_NEEDED;
-
-        emit PermitPhaseChanged(_permitId, ApprovalPhase.PLAN_REVIEW, permit.phase, msg.sender);
-    }
+    // ============ FIX #3: Compliance Scoring ============
 
     /**
-     * @notice Approve plans and lock them (immutable after this)
+     * @notice Set AI compliance score
+     * @dev Called by AI oracle or building official
      */
-    function approvePlansAndLock(uint256 _permitId)
-        external
-        permitExists(_permitId)
-        onlyJurisdiction(permits[_permitId].municipalityId, BUILDING_OFFICIAL)
-    {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(permit.phase == ApprovalPhase.PLAN_REVIEW, "Not in plan review");
-        require(bytes(permit.plans.plansCID).length > 0, "No plans submitted");
-        require(!permit.plans.isLocked, "Plans already locked");
+    function setComplianceScore(
+        uint256 _id,
+        uint8 _score,
+        string[] calldata _flags
+    ) external primaryExists(_id) onlyJurisdiction(permits[_id].municipalityId, BUILDING_OFFICIAL) {
+        PrimaryPermit storage p = permits[_id];
 
-        // Lock plans - IMMUTABLE after this point
-        permit.plans.isLocked = true;
-        permit.plans.lockedAt = block.timestamp;
-        permit.planApprovedAt = block.timestamp;
-        permit.phase = ApprovalPhase.PLAN_APPROVED;
-
-        // Calculate permit fee
-        permit.permitFee = _calculatePermitFee(
-            permit.municipalityId,
-            permit.permitType,
-            permit.grossSquareFootage,
-            permit.estimatedCost
-        );
-
-        permit.phase = ApprovalPhase.FEES_PENDING;
-
-        emit PlansLocked(_permitId, permit.plans.plansCID, block.timestamp);
-        emit PermitApproved(_permitId, msg.sender);
-        emit PermitPhaseChanged(_permitId, ApprovalPhase.PLAN_REVIEW, permit.phase, msg.sender);
-    }
-
-    /**
-     * @notice Approve a plan amendment (creates new CID, preserves history)
-     * @dev Only allowed after permit issuance, requires building official approval
-     */
-    function approvePlanAmendment(
-        uint256 _permitId,
-        string calldata _newCID,
-        string calldata _reason
-    ) external permitExists(_permitId) onlyJurisdiction(permits[_permitId].municipalityId, BUILDING_OFFICIAL) {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(
-            permit.phase == ApprovalPhase.PERMIT_ISSUED ||
-            permit.phase == ApprovalPhase.CONSTRUCTION_ACTIVE,
-            "Cannot amend in current phase"
-        );
-
-        uint256 amendmentNumber = permit.amendments.length + 1;
-
-        permit.amendments.push(PlanAmendment({
-            amendmentNumber: amendmentNumber,
-            previousCID: permit.plans.plansCID,
-            newCID: _newCID,
-            reason: _reason,
-            approvedBy: msg.sender,
-            approvedAt: block.timestamp
-        }));
-
-        // Update current CID but preserve history in amendments array
-        permit.plans.plansCID = _newCID;
-        permit.plans.lockedAt = block.timestamp;
-
-        emit PlanAmendmentApproved(_permitId, amendmentNumber, _newCID);
-    }
-
-    // ============ Fee Payment ============
-
-    /**
-     * @notice Pay permit fees (after plan approval)
-     */
-    function payPermitFees(uint256 _permitId)
-        external
-        nonReentrant
-        permitExists(_permitId)
-    {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(permit.phase == ApprovalPhase.FEES_PENDING, "Fees not pending");
-        require(permit.permitFee > 0, "No fee calculated");
-
-        uint256 remainingFee = permit.permitFee;
-        require(usdc.balanceOf(msg.sender) >= remainingFee, "Insufficient USDC");
-
-        _collectPayment(msg.sender, permit.municipalityId, remainingFee);
-        permit.totalPaid += remainingFee;
-        permit.phase = ApprovalPhase.FEES_PAID;
-
-        _recordPayment(_permitId, remainingFee, "PERMIT");
-
-        emit PaymentReceived(_paymentIdCounter - 1, _permitId, remainingFee, "PERMIT");
-        emit PermitPhaseChanged(_permitId, ApprovalPhase.FEES_PENDING, permit.phase, msg.sender);
-    }
-
-    /**
-     * @notice Issue permit after fees paid
-     */
-    function issuePermit(uint256 _permitId)
-        external
-        permitExists(_permitId)
-        onlyJurisdiction(permits[_permitId].municipalityId, BUILDING_OFFICIAL)
-    {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(permit.phase == ApprovalPhase.FEES_PAID, "Fees not paid");
-        require(permit.plans.isLocked, "Plans not locked");
-
-        // State review check
-        if (permit.requiresStateReview) {
-            require(permit.stateApproved, "State approval required");
+        RiskLevel risk;
+        if (_score >= 80) {
+            risk = RiskLevel.Low;
+        } else if (_score >= 50) {
+            risk = RiskLevel.Medium;
+        } else {
+            risk = RiskLevel.High;
         }
 
-        permit.phase = ApprovalPhase.PERMIT_ISSUED;
-        permit.permitIssuedAt = block.timestamp;
-        permit.expiresAt = block.timestamp + PERMIT_VALIDITY_PERIOD;
+        p.compliance = ComplianceMeta({
+            score: _score,
+            risk: risk,
+            flags: _flags,
+            scoredAt: block.timestamp,
+            scoredBy: msg.sender
+        });
 
-        municipalities[permit.municipalityId].permitsIssued++;
-
-        emit PermitIssued(_permitId, permit.expiresAt);
-        emit PermitPhaseChanged(_permitId, ApprovalPhase.FEES_PAID, permit.phase, msg.sender);
+        emit ComplianceScored(_id, _score, risk);
     }
 
-    // ============ Trade Permits ============
+    // ============ Trade Permit Lifecycle ============
 
-    /**
-     * @notice Submit a trade permit (electrical, plumbing, gas, mechanical)
-     * @dev Trade permits require a valid parent building permit
-     */
     function submitTradePermit(
-        uint256 _parentPermitId,
-        TradePermitType _tradeType,
-        string calldata _workDescription,
+        uint256 _primaryId,
+        TradeType _tradeType,
+        string calldata _scope,
         uint256 _fixtureCount,
         uint256 _estimatedCost
-    ) external nonReentrant permitExists(_parentPermitId) returns (uint256) {
-        PrimaryPermit storage parent = permits[_parentPermitId];
+    ) external nonReentrant primaryExists(_primaryId) returns (uint256) {
+        // FIX #2: Deterministic dependency check
+        (bool eligible, string memory reason) = isTradeEligible(_primaryId, _tradeType);
+        if (!eligible) revert TradeNotEligible();
+
+        // Validate tradesperson license
+        License storage lic = licenses[msg.sender];
+        if (!lic.isActive || lic.isSuspended) revert LicenseInvalid();
+
+        uint256 id = _tradeCounter++;
+        PrimaryPermit storage primary = permits[_primaryId];
+
+        tradePermits[id].id = id;
+        tradePermits[id].primaryId = _primaryId;
+        tradePermits[id].tradeType = _tradeType;
+        tradePermits[id].phase = TradePhase.Submitted;
+        tradePermits[id].contractor = msg.sender;
+        tradePermits[id].contractorLicense = lic.licenseNumber;
+        tradePermits[id].scope = _scope;
+        tradePermits[id].fixtureCount = _fixtureCount;
+        tradePermits[id].estimatedCost = _estimatedCost;
+        tradePermits[id].submittedAt = block.timestamp;
+
+        primary.tradePermitIds.push(id);
+
+        emit TradePermitCreated(id, _primaryId, _tradeType);
+        emit TradePhaseChanged(id, TradePhase.Pending, TradePhase.Submitted, msg.sender);
+
+        return id;
+    }
+
+    function advanceTradePhase(
+        uint256 _id,
+        TradePhase _newPhase
+    ) external tradeExists(_id) {
+        TradePermit storage t = tradePermits[_id];
+        PrimaryPermit storage p = permits[t.primaryId];
+
         require(
-            parent.phase == ApprovalPhase.PERMIT_ISSUED ||
-            parent.phase == ApprovalPhase.CONSTRUCTION_ACTIVE ||
-            parent.phase == ApprovalPhase.TRADES_PENDING,
-            "Parent permit not active"
+            _hasJurisdiction(msg.sender, p.municipalityId, _getInspectorRole(t.tradeType)),
+            "Not authorized"
         );
 
-        // Verify tradesperson license
-        bytes32 requiredRole = _getRequiredTradeRole(_tradeType);
-        require(hasRole(requiredRole, msg.sender), "Trade license required");
-        require(
-            licenses[msg.sender].isActive && !licenses[msg.sender].isSuspended,
-            "License not valid"
-        );
+        TradePhase current = t.phase;
 
-        // Calculate and collect trade permit fee
-        TradeFeeEntry storage feeEntry = tradeFeeSchedules[parent.municipalityId][_tradeType];
-        uint256 fee = feeEntry.baseFee + (feeEntry.perFixtureFee * _fixtureCount);
-        if (fee < feeEntry.minimumFee) fee = feeEntry.minimumFee;
-
-        require(usdc.balanceOf(msg.sender) >= fee, "Insufficient USDC");
-        _collectPayment(msg.sender, parent.municipalityId, fee);
-
-        uint256 tradePermitId = _tradePermitIdCounter++;
-
-        tradePermits[tradePermitId] = TradePermit({
-            tradePermitId: tradePermitId,
-            parentPermitId: _parentPermitId,
-            tradeType: _tradeType,
-            phase: ApprovalPhase.PLAN_REVIEW,
-            licensedTradesperson: msg.sender,
-            tradePersonLicense: licenses[msg.sender].licenseNumber,
-            workDescription: _workDescription,
-            fixtureCount: _fixtureCount,
-            estimatedCost: _estimatedCost,
-            permitFee: fee,
-            totalPaid: fee,
-            submittedAt: block.timestamp,
-            approvedAt: 0,
-            expiresAt: 0,
-            completedAt: 0,
-            assignedInspector: address(0)
-        });
-
-        // Link to parent permit
-        parent.tradePermitIds.push(tradePermitId);
-        if (parent.phase == ApprovalPhase.PERMIT_ISSUED) {
-            parent.phase = ApprovalPhase.TRADES_PENDING;
+        // Validation guards
+        if (_newPhase == TradePhase.Issued) {
+            require(current == TradePhase.Submitted, "Must be submitted");
+            t.issuedAt = block.timestamp;
         }
 
-        _recordPayment(_parentPermitId, fee, "TRADE");
+        if (_newPhase == TradePhase.Finaled) {
+            require(
+                current == TradePhase.Inspected ||
+                current == TradePhase.RoughPassed ||
+                current == TradePhase.FinalScheduled,
+                "Must pass inspection"
+            );
+            t.finaledAt = block.timestamp;
+        }
 
-        emit TradePermitSubmitted(tradePermitId, _parentPermitId, _tradeType);
-
-        return tradePermitId;
+        t.phase = _newPhase;
+        emit TradePhaseChanged(_id, current, _newPhase, msg.sender);
     }
 
-    /**
-     * @notice Approve a trade permit
-     */
-    function approveTradePermit(uint256 _tradePermitId)
-        external
-        tradePermitExists(_tradePermitId)
-    {
-        TradePermit storage trade = tradePermits[_tradePermitId];
-        PrimaryPermit storage parent = permits[trade.parentPermitId];
+    // ============ Inspection Management ============
 
-        bytes32 requiredInspectorRole = _getRequiredInspectorRole(trade.tradeType);
-        require(
-            _hasJurisdiction(msg.sender, parent.municipalityId, requiredInspectorRole),
-            "Not authorized trade inspector"
-        );
-        require(trade.phase == ApprovalPhase.PLAN_REVIEW, "Not in review");
-
-        trade.phase = ApprovalPhase.PERMIT_ISSUED;
-        trade.approvedAt = block.timestamp;
-        trade.expiresAt = parent.expiresAt; // Inherits parent expiration
-        trade.assignedInspector = msg.sender;
-
-        emit TradePermitApproved(_tradePermitId, msg.sender);
-    }
-
-    // ============ Inspections ============
-
-    /**
-     * @notice Schedule an inspection
-     */
     function scheduleInspection(
-        uint256 _permitId,
-        bool _isTradePermit,
-        InspectionCategory _category,
-        uint256 _scheduledDate
-    ) external permitExists(_permitId) returns (uint256) {
-        require(_scheduledDate > block.timestamp, "Must be future date");
+        uint256 _tradeId,
+        InspectionType _type,
+        uint256 _scheduledAt
+    ) external tradeExists(_tradeId) returns (uint256) {
+        (bool eligible,) = canScheduleInspection(_tradeId);
+        require(eligible, "Not eligible for inspection");
 
-        uint256 inspectionId = _inspectionIdCounter++;
+        TradePermit storage t = tradePermits[_tradeId];
+        uint256 inspId = _inspectionCounter++;
 
-        permitInspections[_permitId].push(Inspection({
-            inspectionId: inspectionId,
-            permitId: _permitId,
-            isTradePermit: _isTradePermit,
-            category: _category,
-            scheduledBy: msg.sender,
-            assignedInspector: address(0),
-            scheduledDate: _scheduledDate,
-            completedDate: 0,
-            passed: false,
-            resultCode: "",
+        t.inspections.push(Inspection({
+            id: inspId,
+            inspectionType: _type,
+            result: InspectionResult.Pending,
+            inspector: address(0),
+            scheduledAt: _scheduledAt,
+            completedAt: 0,
             notes: "",
             photoCIDs: new string[](0),
-            corrections: new string[](0),
-            reinspectionDeadline: 0
+            corrections: new string[](0)
         }));
 
-        // Update permit phase
-        PrimaryPermit storage permit = permits[_permitId];
-        if (permit.phase == ApprovalPhase.PERMIT_ISSUED ||
-            permit.phase == ApprovalPhase.CONSTRUCTION_ACTIVE ||
-            permit.phase == ApprovalPhase.INSPECTION_PASSED) {
-            permit.phase = ApprovalPhase.INSPECTION_REQUIRED;
+        // Update trade phase
+        if (_type == InspectionType.Rough) {
+            t.phase = TradePhase.RoughScheduled;
+        } else if (_type == InspectionType.Final) {
+            t.phase = TradePhase.FinalScheduled;
         }
 
-        emit InspectionScheduled(inspectionId, _permitId, _category);
-
-        return inspectionId;
+        emit InspectionScheduled(_tradeId, inspId, _type);
+        return inspId;
     }
 
-    /**
-     * @notice Complete an inspection
-     * @param _permitId Permit identifier
-     * @param _inspectionIndex Index in the inspections array
-     * @param _passed Whether inspection passed
-     * @param _resultCode Result code (PASS, FAIL, PARTIAL, REINSPECT)
-     * @param _notes Inspector notes
-     * @param _photoCIDs IPFS CIDs of inspection photos
-     * @param _corrections Required corrections if failed
-     */
     function completeInspection(
-        uint256 _permitId,
+        uint256 _tradeId,
         uint256 _inspectionIndex,
-        bool _passed,
-        string calldata _resultCode,
+        InspectionResult _result,
         string calldata _notes,
         string[] calldata _photoCIDs,
         string[] calldata _corrections
-    ) external permitExists(_permitId) {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(_inspectionIndex < permitInspections[_permitId].length, "Invalid index");
+    ) external tradeExists(_tradeId) {
+        TradePermit storage t = tradePermits[_tradeId];
+        PrimaryPermit storage p = permits[t.primaryId];
 
-        Inspection storage inspection = permitInspections[_permitId][_inspectionIndex];
-
-        // Verify inspector has jurisdiction for this inspection type
-        bytes32 requiredRole = _getRequiredInspectorRoleForCategory(inspection.category);
         require(
-            _hasJurisdiction(msg.sender, permit.municipalityId, requiredRole),
+            _hasJurisdiction(msg.sender, p.municipalityId, _getInspectorRole(t.tradeType)),
             "Not authorized inspector"
         );
-        require(inspection.completedDate == 0, "Already completed");
+        require(_inspectionIndex < t.inspections.length, "Invalid index");
 
-        inspection.assignedInspector = msg.sender;
-        inspection.completedDate = block.timestamp;
-        inspection.passed = _passed;
-        inspection.resultCode = _resultCode;
-        inspection.notes = _notes;
+        Inspection storage insp = t.inspections[_inspectionIndex];
+        require(insp.result == InspectionResult.Pending, "Already completed");
+
+        insp.result = _result;
+        insp.inspector = msg.sender;
+        insp.completedAt = block.timestamp;
+        insp.notes = _notes;
 
         for (uint i = 0; i < _photoCIDs.length; i++) {
-            inspection.photoCIDs.push(_photoCIDs[i]);
+            insp.photoCIDs.push(_photoCIDs[i]);
         }
 
-        if (_passed) {
-            if (inspection.category == InspectionCategory.CERTIFICATE_OF_OCCUPANCY) {
-                permit.phase = ApprovalPhase.CO_PENDING;
-            } else if (inspection.category == InspectionCategory.FINAL_BUILDING) {
-                permit.phase = ApprovalPhase.FINAL_INSPECTION;
-            } else {
-                permit.phase = ApprovalPhase.INSPECTION_PASSED;
+        // Update phase based on result and type
+        if (_result == InspectionResult.Passed || _result == InspectionResult.Conditional) {
+            if (insp.inspectionType == InspectionType.Rough) {
+                t.phase = TradePhase.RoughPassed;
+            } else if (insp.inspectionType == InspectionType.Final) {
+                t.phase = TradePhase.Inspected;
             }
 
-            emit InspectionCompleted(inspection.inspectionId, true, _resultCode);
-        } else {
-            permit.phase = ApprovalPhase.INSPECTION_FAILED;
-            inspection.reinspectionDeadline = block.timestamp + 30 days;
-
+            // FIX #5: Check if escrow should be released
+            if (canReleasePayment(_tradeId)) {
+                _releaseEscrow(_tradeId);
+            }
+        } else if (_result == InspectionResult.Failed) {
+            if (insp.inspectionType == InspectionType.Rough) {
+                t.phase = TradePhase.RoughFailed;
+            }
             for (uint i = 0; i < _corrections.length; i++) {
-                inspection.corrections.push(_corrections[i]);
+                insp.corrections.push(_corrections[i]);
             }
-
-            emit InspectionFailed(inspection.inspectionId, _corrections);
         }
 
-        emit PermitPhaseChanged(_permitId, ApprovalPhase.INSPECTION_REQUIRED, permit.phase, msg.sender);
+        emit InspectionCompleted(_tradeId, insp.id, _result);
+    }
+
+    // ============ FIX #5: Financial Layer ============
+
+    function payPermitFee(uint256 _id, uint256 _amount) external nonReentrant primaryExists(_id) {
+        PrimaryPermit storage p = permits[_id];
+        require(p.phase == PrimaryPhase.Approved, "Not approved");
+
+        usdc.safeTransferFrom(msg.sender, address(this), _amount);
+
+        // Distribute
+        uint256 stateShare = (_amount * stateFeePercent) / 10000;
+        uint256 muniShare = _amount - stateShare;
+
+        usdc.safeTransfer(stateTreasury, stateShare);
+        usdc.safeTransfer(municipalities[p.municipalityId].treasury, muniShare);
+
+        p.financials.fee = _amount;
+        p.financials.feePaid = true;
+        p.financials.paidAt = block.timestamp;
+        p.financials.receiptHash = keccak256(abi.encodePacked(_id, _amount, block.timestamp, msg.sender));
+
+        municipalities[p.municipalityId].totalRevenue += _amount;
+
+        emit PaymentReceived(_id, _amount, p.financials.receiptHash);
+    }
+
+    function depositEscrow(
+        uint256 _tradeId,
+        uint256 _amount,
+        MilestoneTrigger _releaseOn
+    ) external nonReentrant tradeExists(_tradeId) {
+        TradePermit storage t = tradePermits[_tradeId];
+
+        usdc.safeTransferFrom(msg.sender, address(this), _amount);
+
+        t.financials.escrowAmount = _amount;
+        t.financials.releaseOn = _releaseOn;
+        t.financials.feePaid = true;
+        t.financials.paidAt = block.timestamp;
+    }
+
+    function _releaseEscrow(uint256 _tradeId) internal {
+        TradePermit storage t = tradePermits[_tradeId];
+        require(!t.financials.escrowReleased, "Already released");
+        require(t.financials.escrowAmount > 0, "No escrow");
+
+        usdc.safeTransfer(t.contractor, t.financials.escrowAmount);
+
+        t.financials.escrowReleased = true;
+        t.financials.releasedAt = block.timestamp;
+
+        emit EscrowReleased(_tradeId, t.financials.escrowAmount, t.financials.releaseOn);
     }
 
     // ============ Certificate of Occupancy ============
 
-    /**
-     * @notice Issue Certificate of Occupancy
-     */
-    function issueCertificateOfOccupancy(
-        uint256 _permitId,
+    function issueCO(
+        uint256 _primaryId,
         string calldata _coNumber,
         uint256 _maxOccupancy,
         bool _isTemporary,
-        uint256 _temporaryExpiresAt,
+        uint256 _tempExpiresAt,
         string calldata _coCID
-    ) external permitExists(_permitId) onlyJurisdiction(permits[_permitId].municipalityId, BUILDING_OFFICIAL) {
-        PrimaryPermit storage permit = permits[_permitId];
+    ) external primaryExists(_primaryId) onlyJurisdiction(permits[_primaryId].municipalityId, BUILDING_OFFICIAL) {
+        PrimaryPermit storage p = permits[_primaryId];
         require(
-            permit.phase == ApprovalPhase.CO_PENDING ||
-            permit.phase == ApprovalPhase.FINAL_INSPECTION,
-            "Not ready for C/O"
+            p.phase == PrimaryPhase.FinalInspection ||
+            p.phase == PrimaryPhase.Active,
+            "Not ready for CO"
         );
 
-        // Verify all required trade permits are complete
-        if (permit.requiresTradePermits) {
-            for (uint i = 0; i < permit.tradePermitIds.length; i++) {
-                TradePermit storage trade = tradePermits[permit.tradePermitIds[i]];
-                require(
-                    trade.phase == ApprovalPhase.COMPLETED,
-                    "Trade permit not complete"
-                );
-            }
+        // Verify all trades finaled
+        for (uint i = 0; i < p.tradePermitIds.length; i++) {
+            require(
+                tradePermits[p.tradePermitIds[i]].phase == TradePhase.Finaled,
+                "Trade not finaled"
+            );
         }
 
-        uint256 coId = _coIdCounter++;
+        uint256 coId = _coCounter++;
 
-        certificatesOfOccupancy[_permitId] = CertificateOfOccupancy({
-            coId: coId,
-            permitId: _permitId,
-            municipalityId: permit.municipalityId,
+        certificates[_primaryId] = CertificateOfOccupancy({
+            id: coId,
+            permitId: _primaryId,
             coNumber: _coNumber,
-            occupancyType: permit.useGroup,
+            occupancyType: p.useGroup,
             maxOccupancy: _maxOccupancy,
             isTemporary: _isTemporary,
-            temporaryExpiresAt: _temporaryExpiresAt,
+            expiresAt: _tempExpiresAt,
             issuedBy: msg.sender,
             issuedAt: block.timestamp,
             coCID: _coCID
         });
 
-        permit.phase = ApprovalPhase.COMPLETED;
-        permit.completedAt = block.timestamp;
+        p.phase = PrimaryPhase.Finaled;
+        p.finaledAt = block.timestamp;
 
-        emit CertificateOfOccupancyIssued(coId, _permitId, _coNumber);
-        emit PermitPhaseChanged(_permitId, ApprovalPhase.CO_PENDING, ApprovalPhase.COMPLETED, msg.sender);
+        emit COIssued(coId, _primaryId, _coNumber);
+        emit PrimaryPhaseChanged(_primaryId, PrimaryPhase.FinalInspection, PrimaryPhase.Finaled, msg.sender);
+        emit VoiceStatus(_primaryId, "Certificate of Occupancy issued. Project complete.");
     }
 
-    // ============ Permit Management ============
+    // ============ Internal Helpers ============
 
-    /**
-     * @notice Extend permit validity
-     */
-    function extendPermit(uint256 _permitId, uint256 _extensionDays)
-        external
-        permitExists(_permitId)
-        onlyJurisdiction(permits[_permitId].municipalityId, BUILDING_OFFICIAL)
-    {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(
-            permit.phase == ApprovalPhase.PERMIT_ISSUED ||
-            permit.phase == ApprovalPhase.CONSTRUCTION_ACTIVE ||
-            permit.phase == ApprovalPhase.INSPECTION_REQUIRED ||
-            permit.phase == ApprovalPhase.INSPECTION_PASSED,
-            "Cannot extend in current phase"
-        );
-        require(_extensionDays * 1 days <= MAX_EXTENSION_PERIOD, "Exceeds max extension");
-
-        permit.expiresAt += _extensionDays * 1 days;
-
-        emit PermitExtended(_permitId, permit.expiresAt);
+    function _requiresTradePermits(PrimaryType _type) internal pure returns (bool) {
+        return _type == PrimaryType.NewConstruction ||
+               _type == PrimaryType.Addition ||
+               _type == PrimaryType.Remodel;
     }
 
-    /**
-     * @notice Suspend permit (stop work order)
-     */
-    function suspendPermit(uint256 _permitId, string calldata _reason)
-        external
-        permitExists(_permitId)
-        onlyJurisdiction(permits[_permitId].municipalityId, BUILDING_OFFICIAL)
-    {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(permit.phase != ApprovalPhase.COMPLETED, "Cannot suspend completed");
-
-        ApprovalPhase previousPhase = permit.phase;
-        permit.phase = ApprovalPhase.SUSPENDED;
-
-        emit PermitSuspended(_permitId, _reason);
-        emit PermitPhaseChanged(_permitId, previousPhase, permit.phase, msg.sender);
-    }
-
-    /**
-     * @notice Revoke permit
-     */
-    function revokePermit(uint256 _permitId, string calldata _reason)
-        external
-        permitExists(_permitId)
-        onlyJurisdiction(permits[_permitId].municipalityId, BUILDING_OFFICIAL)
-    {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(permit.phase != ApprovalPhase.COMPLETED, "Cannot revoke completed");
-
-        ApprovalPhase previousPhase = permit.phase;
-        permit.phase = ApprovalPhase.REVOKED;
-
-        emit PermitRevoked(_permitId, _reason);
-        emit PermitPhaseChanged(_permitId, previousPhase, permit.phase, msg.sender);
-    }
-
-    /**
-     * @notice Void permit and issue refund
-     */
-    function voidPermitWithRefund(uint256 _permitId, string calldata _reason)
-        external
-        permitExists(_permitId)
-        onlyJurisdiction(permits[_permitId].municipalityId, MUNICIPAL_CLERK)
-    {
-        PrimaryPermit storage permit = permits[_permitId];
-        require(
-            permit.phase == ApprovalPhase.ZONING_REVIEW ||
-            permit.phase == ApprovalPhase.PLAN_REVIEW ||
-            permit.phase == ApprovalPhase.FEES_PENDING,
-            "Cannot void in current phase"
-        );
-
-        // Calculate refund (application fee minus processing fee)
-        uint256 processingFee = permit.applicationFee / 10; // Keep 10%
-        uint256 refundAmount = permit.totalPaid - processingFee;
-
-        if (refundAmount > 0) {
-            usdc.safeTransfer(permit.applicant, refundAmount);
-
-            // Record refund
-            PaymentRecord[] storage payments = permitPayments[_permitId];
-            for (uint i = 0; i < payments.length; i++) {
-                if (!payments[i].isRefunded) {
-                    payments[i].isRefunded = true;
-                    payments[i].refundedAt = block.timestamp;
-                    payments[i].refundReason = _reason;
-                    emit RefundIssued(payments[i].paymentId, payments[i].amount, _reason);
-                }
-            }
-        }
-
-        permit.phase = ApprovalPhase.VOIDED;
-
-        emit PermitVoided(_permitId, refundAmount);
-    }
-
-    /**
-     * @notice State approval for large projects
-     */
-    function grantStateApproval(uint256 _permitId)
-        external
-        permitExists(_permitId)
-        onlyStateOfficial
-    {
-        permits[_permitId].stateApproved = true;
-    }
-
-    // ============ Internal Functions ============
-
-    function _calculateApplicationFee(
-        bytes32 _municipalityId,
-        PrimaryPermitType _permitType
-    ) internal view returns (uint256) {
-        FeeScheduleEntry storage entry = feeSchedules[_municipalityId][_permitType];
-
-        // If no fee schedule set, use defaults
-        if (entry.baseFee == 0) {
-            // Default application fees (in USDC with 6 decimals)
-            if (_permitType == PrimaryPermitType.RESIDENTIAL_NEW_CONSTRUCTION ||
-                _permitType == PrimaryPermitType.COMMERCIAL_NEW_CONSTRUCTION) {
-                return 250 * 10**6; // $250
-            } else if (_permitType == PrimaryPermitType.DEMOLITION_FULL) {
-                return 150 * 10**6; // $150
-            }
-            return 100 * 10**6; // $100 default
-        }
-
-        return entry.baseFee;
-    }
-
-    function _calculatePermitFee(
-        bytes32 _municipalityId,
-        PrimaryPermitType _permitType,
-        uint256 _squareFootage,
-        uint256 _estimatedCost
-    ) internal view returns (uint256) {
-        FeeScheduleEntry storage entry = feeSchedules[_municipalityId][_permitType];
-
-        uint256 sqftFee = _squareFootage * entry.perSqFtFee;
-        uint256 costFee = (_estimatedCost * 50) / 10000; // 0.5% of cost
-
-        uint256 fee = sqftFee > costFee ? sqftFee : costFee;
-
-        if (fee < entry.minimumFee) fee = entry.minimumFee;
-        if (entry.maximumFee > 0 && fee > entry.maximumFee) fee = entry.maximumFee;
-
-        // Add plan review fee
-        fee += (fee * entry.planReviewPercent) / 10000;
-
-        return fee;
-    }
-
-    function _collectPayment(
-        address _from,
-        bytes32 _municipalityId,
-        uint256 _amount
-    ) internal {
-        // Transfer from payer to contract
-        usdc.safeTransferFrom(_from, address(this), _amount);
-
-        // Calculate state share
-        uint256 stateShare = (_amount * stateFeePercent) / 10000;
-        uint256 muniShare = _amount - stateShare;
-
-        // Distribute
-        usdc.safeTransfer(stateTreasury, stateShare);
-        usdc.safeTransfer(municipalities[_municipalityId].treasury, muniShare);
-
-        // Update stats
-        municipalities[_municipalityId].totalRevenue += _amount;
-    }
-
-    function _recordPayment(
-        uint256 _permitId,
-        uint256 _amount,
-        string memory _paymentType
-    ) internal {
-        uint256 paymentId = _paymentIdCounter++;
-
-        permitPayments[_permitId].push(PaymentRecord({
-            paymentId: paymentId,
-            permitId: _permitId,
-            amount: _amount,
-            paymentType: _paymentType,
-            receiptHash: keccak256(abi.encodePacked(_permitId, _amount, block.timestamp, msg.sender)),
-            paidBy: msg.sender,
-            paidAt: block.timestamp,
-            isRefunded: false,
-            refundedAt: 0,
-            refundReason: ""
-        }));
-
-        emit PaymentReceived(paymentId, _permitId, _amount, _paymentType);
-    }
-
-    function _requiresTradePermits(PrimaryPermitType _type) internal pure returns (bool) {
-        return _type == PrimaryPermitType.RESIDENTIAL_NEW_CONSTRUCTION ||
-               _type == PrimaryPermitType.RESIDENTIAL_ADDITION ||
-               _type == PrimaryPermitType.MULTIFAMILY_NEW_CONSTRUCTION ||
-               _type == PrimaryPermitType.COMMERCIAL_NEW_CONSTRUCTION ||
-               _type == PrimaryPermitType.COMMERCIAL_TENANT_FITOUT ||
-               _type == PrimaryPermitType.INDUSTRIAL_NEW_CONSTRUCTION ||
-               _type == PrimaryPermitType.MIXED_USE;
-    }
-
-    function _getRequiredTradeRole(TradePermitType _type) internal pure returns (bytes32) {
-        if (_type == TradePermitType.ELECTRICAL || _type == TradePermitType.LOW_VOLTAGE) {
-            return LICENSED_ELECTRICIAN;
-        } else if (_type == TradePermitType.PLUMBING) {
-            return LICENSED_PLUMBER;
-        } else if (_type == TradePermitType.GAS) {
-            return LICENSED_GAS_FITTER;
-        }
-        return LICENSED_CONTRACTOR;
-    }
-
-    function _getRequiredInspectorRole(TradePermitType _type) internal pure returns (bytes32) {
-        if (_type == TradePermitType.ELECTRICAL || _type == TradePermitType.LOW_VOLTAGE) {
-            return ELECTRICAL_INSPECTOR;
-        } else if (_type == TradePermitType.PLUMBING) {
-            return PLUMBING_INSPECTOR;
-        } else if (_type == TradePermitType.GAS) {
-            return GAS_INSPECTOR;
-        } else if (_type == TradePermitType.MECHANICAL_HVAC) {
-            return MECHANICAL_INSPECTOR;
-        } else if (_type == TradePermitType.FIRE_SUPPRESSION || _type == TradePermitType.FIRE_ALARM) {
-            return FIRE_INSPECTOR;
-        }
-        return BUILDING_OFFICIAL;
-    }
-
-    function _getRequiredInspectorRoleForCategory(InspectionCategory _category) internal pure returns (bytes32) {
-        if (_category == InspectionCategory.ELECTRICAL_ROUGH ||
-            _category == InspectionCategory.ELECTRICAL_FINAL) {
-            return ELECTRICAL_INSPECTOR;
-        } else if (_category == InspectionCategory.PLUMBING_ROUGH ||
-                   _category == InspectionCategory.PLUMBING_FINAL ||
-                   _category == InspectionCategory.PLUMBING_WATER_TEST) {
-            return PLUMBING_INSPECTOR;
-        } else if (_category == InspectionCategory.GAS_ROUGH ||
-                   _category == InspectionCategory.GAS_FINAL ||
-                   _category == InspectionCategory.GAS_PRESSURE_TEST) {
-            return GAS_INSPECTOR;
-        } else if (_category == InspectionCategory.MECHANICAL_ROUGH ||
-                   _category == InspectionCategory.MECHANICAL_FINAL) {
-            return MECHANICAL_INSPECTOR;
-        } else if (_category == InspectionCategory.FIRE_SUPPRESSION_ROUGH ||
-                   _category == InspectionCategory.FIRE_SUPPRESSION_FINAL ||
-                   _category == InspectionCategory.FIRE_ALARM) {
-            return FIRE_INSPECTOR;
-        }
+    function _getInspectorRole(TradeType _type) internal pure returns (bytes32) {
+        if (_type == TradeType.Electrical || _type == TradeType.LowVoltage) return ELECTRICAL_INSPECTOR;
+        if (_type == TradeType.Plumbing) return PLUMBING_INSPECTOR;
+        if (_type == TradeType.Gas) return GAS_INSPECTOR;
+        if (_type == TradeType.Mechanical) return MECHANICAL_INSPECTOR;
+        if (_type == TradeType.Fire) return FIRE_INSPECTOR;
         return BUILDING_OFFICIAL;
     }
 
     // ============ View Functions ============
 
-    function getPermit(uint256 _permitId) external view returns (
-        uint256 permitId,
-        bytes32 municipalityId,
-        PrimaryPermitType permitType,
-        ApprovalPhase phase,
-        address applicant,
-        uint256 estimatedCost,
-        uint256 grossSquareFootage,
-        uint256 totalPaid,
-        uint256 submittedAt,
-        uint256 expiresAt,
-        bool plansLocked,
-        string memory plansCID
+    function getPrimaryPermit(uint256 _id) external view returns (
+        uint256 id,
+        PrimaryType permitType,
+        PrimaryPhase phase,
+        Jurisdiction jurisdiction,
+        uint8 complianceScore,
+        RiskLevel risk,
+        bool feePaid,
+        uint256 tradeCount
     ) {
-        PrimaryPermit storage p = permits[_permitId];
+        PrimaryPermit storage p = permits[_id];
         return (
-            p.permitId,
-            p.municipalityId,
+            p.id,
             p.permitType,
             p.phase,
-            p.applicant,
-            p.estimatedCost,
-            p.grossSquareFootage,
-            p.totalPaid,
-            p.submittedAt,
-            p.expiresAt,
-            p.plans.isLocked,
-            p.plans.plansCID
+            p.jurisdiction,
+            p.compliance.score,
+            p.compliance.risk,
+            p.financials.feePaid,
+            p.tradePermitIds.length
         );
     }
 
-    function getPermitProperty(uint256 _permitId) external view returns (PropertyRecord memory) {
-        return permits[_permitId].property;
+    function getTradePermit(uint256 _id) external view returns (TradePermit memory) {
+        return tradePermits[_id];
     }
 
-    function getPermitPlans(uint256 _permitId) external view returns (StampedPlanSet memory) {
-        return permits[_permitId].plans;
+    function getTradeInspections(uint256 _id) external view returns (Inspection[] memory) {
+        return tradePermits[_id].inspections;
     }
 
-    function getPermitAmendments(uint256 _permitId) external view returns (PlanAmendment[] memory) {
-        return permits[_permitId].amendments;
+    function getComplianceFlags(uint256 _id) external view returns (string[] memory) {
+        return permits[_id].compliance.flags;
     }
 
-    function getTradePermit(uint256 _tradePermitId) external view returns (TradePermit memory) {
-        return tradePermits[_tradePermitId];
+    function getCertificate(uint256 _primaryId) external view returns (CertificateOfOccupancy memory) {
+        return certificates[_primaryId];
     }
 
-    function getPermitInspections(uint256 _permitId) external view returns (Inspection[] memory) {
-        return permitInspections[_permitId];
+    // ============ Admin ============
+
+    function grantStateApproval(uint256 _id) external onlyState primaryExists(_id) {
+        permits[_id].stateApproved = true;
     }
 
-    function getPermitPayments(uint256 _permitId) external view returns (PaymentRecord[] memory) {
-        return permitPayments[_permitId];
+    function updateStateTreasury(address _new) external onlyState {
+        stateTreasury = _new;
     }
 
-    function getCertificateOfOccupancy(uint256 _permitId) external view returns (CertificateOfOccupancy memory) {
-        return certificatesOfOccupancy[_permitId];
-    }
+    function pause() external onlyState { _pause(); }
+    function unpause() external onlyState { _unpause(); }
 
-    function getApplicantPermits(address _applicant) external view returns (uint256[] memory) {
-        return applicantPermits[_applicant];
-    }
-
-    function getMunicipalityPermits(bytes32 _municipalityId) external view returns (uint256[] memory) {
-        return municipalityPermits[_municipalityId];
-    }
-
-    function getParcelHistory(string calldata _parcelId) external view returns (uint256[] memory) {
-        return parcelPermitHistory[_parcelId];
-    }
-
-    function getMunicipality(bytes32 _id) external view returns (Municipality memory) {
-        return municipalities[_id];
-    }
-
-    function getLicense(address _holder) external view returns (License memory) {
-        return licenses[_holder];
-    }
-
-    function hasJurisdiction(
-        address _official,
-        bytes32 _municipalityId,
-        bytes32 _role
-    ) external view returns (bool) {
-        return _hasJurisdiction(_official, _municipalityId, _role);
-    }
-
-    function isPermitValid(uint256 _permitId) external view returns (bool) {
-        PrimaryPermit storage p = permits[_permitId];
-        if (p.permitId == 0) return false;
-        if (p.phase == ApprovalPhase.COMPLETED) return true;
-        if (p.phase == ApprovalPhase.EXPIRED ||
-            p.phase == ApprovalPhase.REVOKED ||
-            p.phase == ApprovalPhase.VOIDED ||
-            p.phase == ApprovalPhase.SUSPENDED) return false;
-        if (p.expiresAt != 0 && block.timestamp > p.expiresAt) return false;
-        return p.phase == ApprovalPhase.PERMIT_ISSUED ||
-               p.phase == ApprovalPhase.CONSTRUCTION_ACTIVE ||
-               p.phase == ApprovalPhase.INSPECTION_REQUIRED ||
-               p.phase == ApprovalPhase.INSPECTION_PASSED ||
-               p.phase == ApprovalPhase.TRADES_PENDING ||
-               p.phase == ApprovalPhase.FINAL_INSPECTION;
-    }
-
-    function getAllMunicipalities() external view returns (bytes32[] memory) {
-        return municipalityList;
-    }
-
-    // ============ Admin Functions ============
-
-    function updateStateTreasury(address _newTreasury) external onlyStateOfficial {
-        require(_newTreasury != address(0), "Invalid address");
-        stateTreasury = _newTreasury;
-    }
-
-    function updateStateFeePercent(uint256 _newPercent) external onlyStateOfficial {
-        require(_newPercent <= 1000, "Max 10%");
-        stateFeePercent = _newPercent;
-    }
-
-    function updateStateReviewThreshold(uint256 _newThreshold) external onlyStateOfficial {
-        stateReviewThreshold = _newThreshold;
-    }
-
-    function pause() external onlyStateOfficial {
-        _pause();
-    }
-
-    function unpause() external onlyStateOfficial {
-        _unpause();
-    }
-
-    /**
-     * @notice Emergency withdrawal of stuck tokens
-     */
-    function emergencyWithdraw(address _token, address _to, uint256 _amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        require(_to != address(0), "Invalid recipient");
+    function emergencyWithdraw(address _token, address _to, uint256 _amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_token).safeTransfer(_to, _amount);
     }
 }
