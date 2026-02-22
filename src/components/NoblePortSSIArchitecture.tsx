@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * NoblePort SSI Architecture Dashboard
  *
