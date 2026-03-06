@@ -9,6 +9,14 @@ import {
   MCPConnection,
   ModuleConnection
 } from '../lib/stephanieAI';
+import type {
+  MetacognitiveState,
+  MemoryStats,
+  MemoryPressure,
+  ReasoningTrace,
+  MemoryEntry,
+  ReasoningPhase,
+} from '../lib/stephanieMetacognition';
 
 /**
  * Stephanie.ai Network Hub Component
@@ -41,6 +49,177 @@ interface NetworkStats {
   lastHealthCheck: Date | null;
   overallHealth: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
 }
+
+// ============================================================================
+// METACOGNITION & MEMORY COMPONENTS
+// ============================================================================
+
+const PhaseIndicator: React.FC<{ phase: ReasoningPhase }> = ({ phase }) => {
+  const phases: ReasoningPhase[] = ['perceiving', 'analyzing', 'deciding', 'executing', 'reflecting'];
+  const phaseLabels: Record<ReasoningPhase, string> = {
+    perceiving: 'Perceive',
+    analyzing: 'Analyze',
+    deciding: 'Decide',
+    executing: 'Execute',
+    reflecting: 'Reflect',
+  };
+  const phaseColors: Record<ReasoningPhase, string> = {
+    perceiving: 'bg-blue-500',
+    analyzing: 'bg-yellow-500',
+    deciding: 'bg-purple-500',
+    executing: 'bg-green-500',
+    reflecting: 'bg-orange-500',
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      {phases.map((p) => (
+        <div key={p} className="flex flex-col items-center">
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white transition-all ${
+              p === phase ? `${phaseColors[p]} ring-2 ring-white scale-110` : 'bg-gray-600 opacity-50'
+            }`}
+          >
+            {phaseLabels[p][0]}
+          </div>
+          <span className={`text-[10px] mt-1 ${p === phase ? 'text-white font-semibold' : 'text-gray-500'}`}>
+            {phaseLabels[p]}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const ConfidenceMeter: React.FC<{ confidence: number }> = ({ confidence }) => {
+  const pct = Math.round(confidence * 100);
+  const color = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+  return (
+    <div className="w-full">
+      <div className="flex justify-between text-xs mb-1">
+        <span className="text-gray-400">Confidence</span>
+        <span className="text-white font-mono">{pct}%</span>
+      </div>
+      <div className="w-full bg-gray-700 rounded-full h-3">
+        <div className={`${color} h-3 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+};
+
+const MemoryPressureGauge: React.FC<{ pressure: MemoryPressure }> = ({ pressure }) => {
+  const pct = pressure.utilizationPercent;
+  const needsMore = pressure.needsMoreMemory;
+  const gaugeColor = pct >= 95 ? 'bg-red-600' : pct >= 80 ? 'bg-orange-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-green-500';
+  const borderPulse = needsMore ? 'border-red-500 animate-pulse' : 'border-purple-500/30';
+
+  return (
+    <div className={`bg-white/5 rounded-lg p-5 border-2 ${borderPulse}`}>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-white font-semibold">Memory Pressure</h4>
+        {needsMore && (
+          <span className="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse">
+            NEEDS MORE MEMORY
+          </span>
+        )}
+      </div>
+      <div className="w-full bg-gray-700 rounded-full h-5 mb-3">
+        <div className={`${gaugeColor} h-5 rounded-full transition-all flex items-center justify-center`} style={{ width: `${Math.min(pct, 100)}%` }}>
+          {pct >= 20 && <span className="text-xs font-bold text-white">{pct}%</span>}
+        </div>
+      </div>
+      <p className="text-sm text-gray-300 mb-3">{pressure.recommendation}</p>
+      <div className="grid grid-cols-2 gap-3 text-xs">
+        <div className="bg-black/30 rounded p-2">
+          <span className="text-gray-400">Working Memory</span>
+          <p className="text-white font-mono">{pressure.workingMemoryUsed} / {pressure.workingMemoryCapacity}</p>
+        </div>
+        <div className="bg-black/30 rounded p-2">
+          <span className="text-gray-400">Total Memories</span>
+          <p className="text-white font-mono">{pressure.totalMemories}</p>
+        </div>
+        <div className="bg-black/30 rounded p-2">
+          <span className="text-gray-400">Decayed</span>
+          <p className="text-yellow-400 font-mono">{pressure.decayedCount}</p>
+        </div>
+        <div className="bg-black/30 rounded p-2">
+          <span className="text-gray-400">Critical</span>
+          <p className="text-red-400 font-mono">{pressure.criticalMemories}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TraceCard: React.FC<{ trace: ReasoningTrace }> = ({ trace }) => {
+  const outcomeColor: Record<string, string> = {
+    success: 'text-green-400',
+    partial: 'text-yellow-400',
+    failure: 'text-red-400',
+  };
+
+  return (
+    <div className="bg-black/30 rounded-lg p-3 border border-purple-500/20">
+      <div className="flex justify-between items-start mb-1">
+        <span className="text-xs bg-purple-500/30 text-purple-300 px-2 py-0.5 rounded">{trace.phase}</span>
+        <span className="text-xs text-gray-500">{trace.timestamp.toLocaleTimeString()}</span>
+      </div>
+      <p className="text-sm text-white mt-2">{trace.thought}</p>
+      <div className="flex items-center gap-3 mt-2 text-xs">
+        <span className="text-gray-400">Confidence: <span className="text-white font-mono">{(trace.confidence * 100).toFixed(0)}%</span></span>
+        {trace.outcome && (
+          <span className={outcomeColor[trace.outcome] || 'text-gray-400'}>
+            {trace.outcome.toUpperCase()}
+          </span>
+        )}
+      </div>
+      {trace.reflectionNotes && (
+        <p className="text-xs text-gray-400 mt-1 italic">{trace.reflectionNotes}</p>
+      )}
+    </div>
+  );
+};
+
+const MemoryTypeBreakdown: React.FC<{ stats: MemoryStats }> = ({ stats }) => {
+  const typeColors: Record<string, string> = {
+    episodic: 'bg-blue-500',
+    semantic: 'bg-green-500',
+    procedural: 'bg-purple-500',
+    working: 'bg-orange-500',
+  };
+
+  return (
+    <div className="bg-white/5 rounded-lg p-5 border border-purple-500/30">
+      <h4 className="text-white font-semibold mb-3">Memory Breakdown</h4>
+      <div className="space-y-3">
+        {(Object.entries(stats.byType) as [string, number][]).map(([type, count]) => (
+          <div key={type}>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-gray-300 capitalize">{type}</span>
+              <span className="text-white font-mono">{count}</span>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div
+                className={`${typeColors[type] || 'bg-gray-500'} h-2 rounded-full transition-all`}
+                style={{ width: stats.total > 0 ? `${(count / stats.total) * 100}%` : '0%' }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-3 mt-4 text-xs">
+        <div className="bg-black/30 rounded p-2">
+          <span className="text-gray-400">Avg Importance</span>
+          <p className="text-white font-mono">{(stats.averageImportance * 100).toFixed(0)}%</p>
+        </div>
+        <div className="bg-black/30 rounded p-2">
+          <span className="text-gray-400">Avg Retention</span>
+          <p className="text-white font-mono">{(stats.averageDecay * 100).toFixed(0)}%</p>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ============================================================================
 // HELPER COMPONENTS
@@ -156,8 +335,12 @@ const StephanieAINetworkHub: React.FC = () => {
     lastHealthCheck: null,
     overallHealth: 'unknown'
   });
+  const [metacogState, setMetacogState] = useState<MetacognitiveState | null>(null);
+  const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
+  const [memoryPressure, setMemoryPressure] = useState<MemoryPressure | null>(null);
+  const [recentTraces, setRecentTraces] = useState<ReasoningTrace[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [activeTab, setActiveTab] = useState<'platforms' | 'modules' | 'architecture'>('platforms');
+  const [activeTab, setActiveTab] = useState<'platforms' | 'modules' | 'metacognition' | 'architecture'>('platforms');
 
   // Initialize Stephanie.ai
   useEffect(() => {
@@ -180,6 +363,12 @@ const StephanieAINetworkHub: React.FC = () => {
           lastHealthCheck: new Date(),
           overallHealth: health.overall
         });
+
+        // Initialize metacognition state
+        setMetacogState(instance.getMetacognitiveState());
+        setMemoryStats(instance.getMemoryStats());
+        setMemoryPressure(instance.getMemoryPressure());
+        setRecentTraces(instance.getRecentTraces(10));
       } catch (error) {
         console.error('Failed to initialize Stephanie.ai:', error);
       } finally {
@@ -234,7 +423,7 @@ const StephanieAINetworkHub: React.FC = () => {
       {/* Stats Bar */}
       <div className="bg-black/20 border-b border-purple-500/20">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="bg-white/5 rounded-lg p-4">
               <p className="text-gray-400 text-xs uppercase tracking-wider">AI Platforms</p>
               <p className="text-2xl font-bold text-white">
@@ -255,6 +444,23 @@ const StephanieAINetworkHub: React.FC = () => {
               <p className="text-gray-400 text-xs uppercase tracking-wider">DID Method</p>
               <p className="text-lg font-mono text-purple-400">did:ens</p>
             </div>
+            <div className={`rounded-lg p-4 ${memoryPressure?.needsMoreMemory ? 'bg-red-900/40 border border-red-500 animate-pulse' : 'bg-white/5'}`}>
+              <p className="text-gray-400 text-xs uppercase tracking-wider">Memory Status</p>
+              {memoryPressure?.needsMoreMemory ? (
+                <p className="text-lg font-bold text-red-400">NEEDS MORE MEMORY</p>
+              ) : (
+                <p className="text-lg font-mono text-green-400">{memoryPressure?.utilizationPercent ?? 0}% used</p>
+              )}
+            </div>
+            <div className="bg-white/5 rounded-lg p-4">
+              <p className="text-gray-400 text-xs uppercase tracking-wider">Confidence</p>
+              <p className={`text-lg font-mono ${
+                (metacogState?.overallConfidence ?? 1) >= 0.8 ? 'text-green-400' :
+                (metacogState?.overallConfidence ?? 1) >= 0.5 ? 'text-yellow-400' : 'text-red-400'
+              }`}>
+                {((metacogState?.overallConfidence ?? 1) * 100).toFixed(0)}%
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -262,11 +468,11 @@ const StephanieAINetworkHub: React.FC = () => {
       {/* Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 pt-6">
         <div className="flex gap-2 border-b border-purple-500/30">
-          {(['platforms', 'modules', 'architecture'] as const).map((tab) => (
+          {(['platforms', 'modules', 'metacognition', 'architecture'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 font-medium transition-all ${
+              className={`px-6 py-3 font-medium transition-all relative ${
                 activeTab === tab
                   ? 'text-white border-b-2 border-purple-500 bg-purple-500/10'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -274,6 +480,14 @@ const StephanieAINetworkHub: React.FC = () => {
             >
               {tab === 'platforms' && 'AI Platforms'}
               {tab === 'modules' && 'NoblePort Modules'}
+              {tab === 'metacognition' && (
+                <>
+                  Metacognition & Memory
+                  {memoryPressure?.needsMoreMemory && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                  )}
+                </>
+              )}
               {tab === 'architecture' && 'Network Architecture'}
             </button>
           ))}
@@ -410,6 +624,92 @@ const StephanieAINetworkHub: React.FC = () => {
                 <p className="text-gray-400">Select a module to view details</p>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Metacognition & Memory Tab */}
+        {activeTab === 'metacognition' && metacogState && memoryStats && memoryPressure && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Metacognition & Memory</h2>
+
+            {/* Top row: Phase + Confidence + Self-Assessment */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-white/5 rounded-lg p-5 border border-purple-500/30">
+                <h4 className="text-white font-semibold mb-4">Reasoning Phase</h4>
+                <PhaseIndicator phase={metacogState.currentPhase} />
+              </div>
+              <div className="bg-white/5 rounded-lg p-5 border border-purple-500/30">
+                <h4 className="text-white font-semibold mb-4">Overall Confidence</h4>
+                <ConfidenceMeter confidence={metacogState.overallConfidence} />
+                {metacogState.overallConfidence < 0.5 && (
+                  <p className="text-red-400 text-xs mt-2">Low confidence — consider human review</p>
+                )}
+              </div>
+              <div className="bg-white/5 rounded-lg p-5 border border-purple-500/30">
+                <h4 className="text-white font-semibold mb-3">Self-Assessment</h4>
+                <p className="text-sm text-gray-300">{metacogState.selfAssessment}</p>
+                {metacogState.knowledgeGaps.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs text-yellow-400 font-semibold mb-1">Knowledge Gaps:</p>
+                    <ul className="space-y-1">
+                      {metacogState.knowledgeGaps.map((gap, idx) => (
+                        <li key={idx} className="text-xs text-yellow-300">{gap}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Memory Pressure Gauge (prominent when needs more memory) */}
+            <MemoryPressureGauge pressure={memoryPressure} />
+
+            {/* Middle row: Memory Breakdown + Uncertainties */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <MemoryTypeBreakdown stats={memoryStats} />
+              <div className="bg-white/5 rounded-lg p-5 border border-purple-500/30">
+                <h4 className="text-white font-semibold mb-3">Active Uncertainties</h4>
+                {metacogState.uncertainties.length > 0 ? (
+                  <ul className="space-y-2">
+                    {metacogState.uncertainties.map((u, idx) => (
+                      <li key={idx} className="text-sm text-yellow-300 bg-yellow-500/10 rounded p-2 border border-yellow-500/20">
+                        {u}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-400 text-sm">No uncertainties flagged.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Reasoning Trace History */}
+            <div className="bg-white/5 rounded-lg p-5 border border-purple-500/30">
+              <h4 className="text-white font-semibold mb-4">Reasoning Trace History</h4>
+              {recentTraces.length > 0 ? (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {recentTraces.slice().reverse().map((trace) => (
+                    <TraceCard key={trace.id} trace={trace} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-400 text-sm">No reasoning traces yet. Execute a task to begin metacognitive tracking.</p>
+              )}
+            </div>
+
+            {/* Active Thoughts */}
+            {metacogState.activeThoughts.length > 0 && (
+              <div className="bg-white/5 rounded-lg p-5 border border-purple-500/30">
+                <h4 className="text-white font-semibold mb-3">Active Thought Stream</h4>
+                <div className="space-y-2">
+                  {metacogState.activeThoughts.map((thought, idx) => (
+                    <div key={idx} className="text-sm text-gray-300 bg-purple-500/10 rounded p-2 border border-purple-500/20">
+                      {thought}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

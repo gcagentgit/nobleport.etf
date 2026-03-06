@@ -11,6 +11,16 @@
 import { ethers } from 'ethers';
 import { Resolver } from 'did-resolver';
 import { getResolver as getEnsResolver } from 'ens-did-resolver';
+import {
+  StephanieMetacognition,
+  createMetacognition,
+  MetacognitiveState,
+  MemoryStats,
+  MemoryPressure,
+  ReasoningTrace,
+  MemoryEntry,
+  MemoryType,
+} from './stephanieMetacognition';
 
 // ============================================================================
 // NOBLEPORT MODULE DEFINITIONS
@@ -424,6 +434,14 @@ export interface StephanieConfig {
   did: string;
   providerUrl?: string;
   enabledPlatforms?: string[];
+  metacognition?: {
+    workingMemoryCapacity?: number;
+    memoryDecayRate?: number;
+    confidenceThreshold?: number;
+    memoryPressureThreshold?: number;
+    maxReasoningTraces?: number;
+    enableAutoReflection?: boolean;
+  };
 }
 
 export interface ModuleConnection {
@@ -458,6 +476,7 @@ export class StephanieAI {
   private resolver: Resolver | null = null;
   private moduleConnections: Map<string, ModuleConnection> = new Map();
   private platformConnections: Map<string, MCPConnection> = new Map();
+  private _metacognition: StephanieMetacognition;
 
   constructor(config: StephanieConfig) {
     this.config = {
@@ -466,6 +485,7 @@ export class StephanieAI {
       providerUrl: config.providerUrl,
       enabledPlatforms: config.enabledPlatforms || AI_PLATFORM_CONNECTIONS.map(p => p.id)
     };
+    this._metacognition = createMetacognition(config.metacognition);
   }
 
   // ========== INITIALIZATION ==========
@@ -577,27 +597,107 @@ export class StephanieAI {
       .filter(p => p.capabilities.includes(capability));
   }
 
+  // ========== METACOGNITION & MEMORY ==========
+
+  get mind(): StephanieMetacognition {
+    return this._metacognition;
+  }
+
+  getMetacognitiveState(): MetacognitiveState {
+    return this._metacognition.metacognition.getState();
+  }
+
+  getMemoryStats(): MemoryStats {
+    return this._metacognition.memory.getStats();
+  }
+
+  getMemoryPressure(): MemoryPressure {
+    return this._metacognition.memory.getMemoryPressure();
+  }
+
+  needsMoreMemory(): boolean {
+    return this._metacognition.memory.getMemoryPressure().needsMoreMemory;
+  }
+
+  storeMemory(type: MemoryType, content: string, tags?: string[], importance?: number): MemoryEntry {
+    return this._metacognition.memory.store({ type, content, tags, importance });
+  }
+
+  searchMemory(keyword: string, type?: MemoryType): MemoryEntry[] {
+    return this._metacognition.memory.search({ keyword, type, limit: 20 });
+  }
+
+  getRecentTraces(limit: number = 10): ReasoningTrace[] {
+    return this._metacognition.metacognition.getTraces({ limit });
+  }
+
+  selfReflect(): string {
+    return this._metacognition.metacognition.reflect();
+  }
+
   // ========== TASK ORCHESTRATION ==========
 
   async executeTask(request: AITaskRequest): Promise<AITaskResponse> {
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Metacognition: begin task perception
+    this._metacognition.beginTask(taskId, `${request.taskType} task (${request.priority} priority)`);
+
     // Find best platform for the task
     const platform = this.selectBestPlatform(request);
 
     if (!platform) {
+      this._metacognition.completeTask(taskId, 'failure', 'No suitable AI platform found for capabilities requested.');
       throw new Error('No suitable AI platform found for the requested task');
     }
+
+    // Metacognition: analyze alternatives
+    const candidates = Array.from(this.platformConnections.values())
+      .filter(p => p.status === 'active')
+      .map(p => p.name);
+    this._metacognition.analyzeTask(
+      taskId,
+      `Evaluating ${candidates.length} platforms for ${request.taskType}`,
+      platform ? 0.9 : 0.3,
+      candidates
+    );
+
+    // Metacognition: decide on platform
+    this._metacognition.decideAction(
+      taskId,
+      `Selected ${platform.name} for execution`,
+      0.92,
+      `Best match for required capabilities: ${(request.requiredCapabilities || []).join(', ')}`
+    );
 
     const startTime = Date.now();
 
     // Execute task (placeholder for actual API calls)
     const result = await this.callPlatform(platform, request);
+    const processingTime = Date.now() - startTime;
+
+    // Metacognition: reflect on outcome
+    this._metacognition.completeTask(
+      taskId,
+      'success',
+      `Completed on ${platform.name} in ${processingTime}ms.`
+    );
+
+    // Store execution as episodic memory
+    this._metacognition.memory.store({
+      type: 'episodic',
+      content: `Executed ${request.taskType} on ${platform.name}. Processing time: ${processingTime}ms.`,
+      context: { taskId, platform: platform.id, processingTime },
+      tags: ['execution', request.taskType, platform.provider.toLowerCase()],
+      importance: request.priority === 'critical' ? 0.9 : 0.5,
+    });
 
     return {
-      taskId: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      taskId,
       platform: platform.id,
       result,
       confidence: 0.95,
-      processingTime: Date.now() - startTime
+      processingTime
     };
   }
 
