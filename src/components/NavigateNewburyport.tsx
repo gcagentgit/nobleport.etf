@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   DirectoryListing,
   DirectoryCategory,
@@ -11,6 +11,13 @@ import {
   NEWBURYPORT_STATS,
   HISTORIC_FACTS,
 } from '../data/newburyport-directory';
+import {
+  createStephanieDirectoryAgent,
+  StephanieDirectoryAgent,
+  AgentResponse,
+  ConversationMessage,
+} from '../lib/stephanieDirectoryAgent';
+import { AVATAR_PERSONALITIES } from '../data/newburyport-schema';
 
 // ============================================================================
 // ICON MAP (simple text-based icons for categories)
@@ -268,6 +275,32 @@ const NavigateNewburyport: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<DirectoryListing | null>(null);
   const [activeTab, setActiveTab] = useState<'directory' | 'events' | 'areas' | 'history' | 'about'>('directory');
+
+  // Stephanie.ai Assistant State
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantQuery, setAssistantQuery] = useState('');
+  const [assistantMessages, setAssistantMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string; listings?: DirectoryListing[] }>>([]);
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [agent] = useState<StephanieDirectoryAgent>(() => createStephanieDirectoryAgent({ personality: 'FRIENDLY_LOCAL' }));
+
+  const handleAssistantSubmit = useCallback(async () => {
+    const q = assistantQuery.trim();
+    if (!q) return;
+
+    setAssistantMessages((prev) => [...prev, { role: 'user', text: q }]);
+    setAssistantQuery('');
+    setAssistantLoading(true);
+
+    try {
+      const response = await agent.processQuery(q);
+      setAssistantMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: response.text, listings: response.listings },
+      ]);
+    } finally {
+      setAssistantLoading(false);
+    }
+  }, [assistantQuery, agent]);
 
   // Filtered listings
   const filteredListings = useMemo(() => {
@@ -650,6 +683,117 @@ const NavigateNewburyport: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Stephanie.ai Assistant Floating Button */}
+      <button
+        onClick={() => setAssistantOpen(!assistantOpen)}
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 to-sky-600 text-white shadow-lg shadow-purple-600/30 hover:shadow-purple-600/50 transition-all flex items-center justify-center z-50"
+        title="Ask Stephanie.ai"
+      >
+        <span className="text-2xl">{assistantOpen ? '\u2715' : '\u2728'}</span>
+      </button>
+
+      {/* Stephanie.ai Assistant Panel */}
+      {assistantOpen && (
+        <div className="fixed bottom-24 right-6 w-96 max-h-[32rem] bg-slate-900 border border-purple-500/30 rounded-2xl shadow-2xl shadow-purple-900/30 z-50 flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-purple-900/80 to-sky-900/80 px-4 py-3 border-b border-purple-500/20">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{'\u2728'}</span>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Stephanie<span className="text-purple-400">.ai</span></h3>
+                <p className="text-[10px] text-purple-300">Your Newburyport Guide</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px] max-h-[20rem]">
+            {assistantMessages.length === 0 && (
+              <div className="text-center py-6">
+                <p className="text-sm text-slate-400">{agent.greeting}</p>
+                <div className="mt-3 space-y-1">
+                  {['Best restaurants for dinner?', 'What to do this weekend?', 'Tell me about Newburyport history'].map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => {
+                        setAssistantQuery(q);
+                      }}
+                      className="block w-full text-left text-xs text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {assistantMessages.map((msg, i) => (
+              <div
+                key={i}
+                className={`text-sm ${
+                  msg.role === 'user'
+                    ? 'text-right'
+                    : 'text-left'
+                }`}
+              >
+                <div
+                  className={`inline-block max-w-[85%] px-3 py-2 rounded-xl ${
+                    msg.role === 'user'
+                      ? 'bg-sky-600 text-white rounded-br-sm'
+                      : 'bg-slate-800 text-slate-200 rounded-bl-sm'
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap text-xs">{msg.text}</div>
+                </div>
+                {msg.role === 'assistant' && msg.listings && msg.listings.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {msg.listings.slice(0, 3).map((l) => (
+                      <button
+                        key={l.id}
+                        onClick={() => {
+                          setSelectedListing(l);
+                          setActiveTab('directory');
+                        }}
+                        className="block w-full text-left text-[10px] bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 px-2 py-1 rounded transition-colors"
+                      >
+                        <span className="text-white font-medium">{l.name}</span>
+                        <span className="text-slate-500 ml-1">({l.subcategory})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            {assistantLoading && (
+              <div className="flex items-center gap-2 text-xs text-purple-400">
+                <div className="w-3 h-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                Stephanie is thinking...
+              </div>
+            )}
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-slate-800 p-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={assistantQuery}
+                onChange={(e) => setAssistantQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAssistantSubmit()}
+                placeholder="Ask about Newburyport..."
+                className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+              />
+              <button
+                onClick={handleAssistantSubmit}
+                disabled={!assistantQuery.trim() || assistantLoading}
+                className="px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs text-white transition-colors"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="bg-slate-900/50 border-t border-slate-800 mt-12">
