@@ -10,9 +10,11 @@ import {
   DirectoryListing,
   DirectoryCategory,
   DirectoryEvent,
+  HistoricFact,
   DIRECTORY_CATEGORIES,
   DIRECTORY_LISTINGS,
   COMMUNITY_EVENTS,
+  HISTORIC_FACTS,
   NEWBURYPORT_AREAS,
   NEWBURYPORT_STATS,
 } from '../data/newburyport-directory';
@@ -147,6 +149,10 @@ export class NewburyportDirectory {
 
   getEvents(): DirectoryEvent[] {
     return this.events;
+  }
+
+  getHistoricFacts(): HistoricFact[] {
+    return HISTORIC_FACTS;
   }
 
   getAreas() {

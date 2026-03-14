@@ -9,6 +9,7 @@ import {
   COMMUNITY_EVENTS,
   NEWBURYPORT_AREAS,
   NEWBURYPORT_STATS,
+  HISTORIC_FACTS,
 } from '../data/newburyport-directory';
 
 // ============================================================================
@@ -20,10 +21,18 @@ const CATEGORY_ICONS: Record<string, string> = {
   shopping: '\u{1F6CD}',
   services: '\u{1F4BC}',
   recreation: '\u{2600}',
+  historic: '\u{1F3DB}',
   arts: '\u{1F3A8}',
   lodging: '\u{1F6CF}',
-  community: '\u{1F3DB}',
-  realestate: '\u{1F3E0}',
+  community: '\u{1F3E2}',
+};
+
+const FACT_CATEGORY_COLORS: Record<string, string> = {
+  maritime: 'border-sky-500/30 bg-sky-950/30',
+  history: 'border-amber-500/30 bg-amber-950/30',
+  people: 'border-purple-500/30 bg-purple-950/30',
+  firsts: 'border-emerald-500/30 bg-emerald-950/30',
+  culture: 'border-rose-500/30 bg-rose-950/30',
 };
 
 // ============================================================================
@@ -258,7 +267,7 @@ const NavigateNewburyport: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<DirectoryListing | null>(null);
-  const [activeTab, setActiveTab] = useState<'directory' | 'events' | 'areas' | 'about'>('directory');
+  const [activeTab, setActiveTab] = useState<'directory' | 'events' | 'areas' | 'history' | 'about'>('directory');
 
   // Filtered listings
   const filteredListings = useMemo(() => {
@@ -368,7 +377,7 @@ const NavigateNewburyport: React.FC = () => {
       <nav className="bg-slate-900/50 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-1">
-            {(['directory', 'events', 'areas', 'about'] as const).map((tab) => (
+            {(['directory', 'events', 'areas', 'history', 'about'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -523,6 +532,38 @@ const NavigateNewburyport: React.FC = () => {
                       </span>
                     ))}
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== HISTORY TAB ===== */}
+        {activeTab === 'history' && (
+          <div className="space-y-6 max-w-4xl">
+            <h2 className="text-xl font-bold text-white">Historic Facts & Trivia</h2>
+            <p className="text-sm text-slate-400">
+              Discover the rich history behind Newburyport &mdash; from clipper ships and the Underground Railroad
+              to eccentric businessmen and presidential visits.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {HISTORIC_FACTS.map((fact) => (
+                <div
+                  key={fact.id}
+                  className={`rounded-xl p-5 border ${FACT_CATEGORY_COLORS[fact.category] || 'border-slate-800 bg-slate-900/60'}`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-white">{fact.title}</h3>
+                    {fact.year && (
+                      <span className="text-[10px] bg-white/10 text-slate-300 px-2 py-0.5 rounded-full shrink-0 ml-2">
+                        {fact.year}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-300">{fact.description}</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mt-3">
+                    {fact.category}
+                  </p>
                 </div>
               ))}
             </div>
