@@ -32,8 +32,14 @@ python-dateutil==2.9.0
 structlog==24.4.0
 prometheus-client==0.21.1
 
+# Stripe Payments
+stripe==11.4.1
+
 # Web3 Bridge
 web3==7.6.0
+
+# Email & SMS Notifications
+sendgrid==6.11.0
 
 # Environment & Config
 python-dotenv==1.0.1

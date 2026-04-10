@@ -61,6 +61,24 @@ class Settings(BaseSettings):
     nobleport_permit_contract_address: Optional[str] = None
     nobleport_approval_contract_address: Optional[str] = None
 
+    # Stripe Payments
+    stripe_secret_key: Optional[str] = None
+    stripe_webhook_secret: Optional[str] = None
+    stripe_success_url: str = "http://localhost:3000/success"
+    stripe_cancel_url: str = "http://localhost:3000/proposal/{proposal_id}"
+
+    # Proposals
+    proposal_expiry_days: int = 30
+    deposit_required_percent: float = 25.0
+
+    # Notifications
+    sendgrid_api_key: Optional[str] = None
+    notification_from_email: str = "ops@nobleport.eth"
+    ops_notification_emails: list[str] = Field(default=[])
+    twilio_account_sid: Optional[str] = None
+    twilio_auth_token: Optional[str] = None
+    twilio_from_number: Optional[str] = None
+
     # Stephanie.ai MCP Connection
     stephanie_mcp_endpoint: str = "http://localhost:3100/mcp"
     stephanie_api_key: Optional[str] = None
