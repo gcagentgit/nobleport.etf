@@ -454,6 +454,199 @@ class SelectionResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --- Estimate Schemas ---
+
+class EstimateCreate(BaseModel):
+    lead_id: str
+    estimate_number: str = Field(..., max_length=50)
+    project_name: str = Field(..., max_length=255)
+    base_value: float
+    markup_percent: float = 0.0
+    deposit_percent: float = 30.0
+    scope_description: Optional[str] = None
+    job_type: Optional[str] = None
+    win_probability: Optional[float] = None
+    notes: Optional[str] = None
+
+
+class EstimateUpdate(BaseModel):
+    project_name: Optional[str] = None
+    base_value: Optional[float] = None
+    markup_percent: Optional[float] = None
+    deposit_percent: Optional[float] = None
+    status: Optional[str] = None
+    scope_description: Optional[str] = None
+    job_type: Optional[str] = None
+    win_probability: Optional[float] = None
+    notes: Optional[str] = None
+
+
+class EstimateResponse(BaseModel):
+    id: str
+    lead_id: Optional[str]
+    estimate_number: str
+    project_name: str
+    client_name: str
+    client_email: Optional[str]
+    client_phone: Optional[str]
+    status: str
+    base_value: float
+    markup_percent: float
+    markup_amount: float
+    total_value: float
+    deposit_percent: float
+    deposit_amount: float
+    win_probability: Optional[float]
+    scope_description: Optional[str]
+    job_type: Optional[str]
+    valid_until: Optional[datetime]
+    sent_at: Optional[datetime]
+    approved_at: Optional[datetime]
+    costcertified_id: Optional[str]
+    hubspot_deal_id: Optional[str]
+    notes: Optional[str]
+    version: int
+    parent_estimate_id: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- Job Schemas ---
+
+class JobUpdate(BaseModel):
+    status: Optional[str] = None
+    crew: Optional[str] = None
+    start_date: Optional[date] = None
+    estimated_end_date: Optional[date] = None
+    total_costs: Optional[float] = None
+    notes: Optional[str] = None
+    site_address: Optional[str] = None
+    site_city: Optional[str] = None
+    site_state: Optional[str] = None
+    site_zip: Optional[str] = None
+
+
+class JobResponse(BaseModel):
+    id: str
+    estimate_id: str
+    project_id: Optional[str]
+    job_number: str
+    status: str
+    deposit_required: float
+    deposit_paid: float
+    deposit_paid_at: Optional[datetime]
+    deposit_gate_passed: bool
+    contract_value: float
+    total_invoiced: float
+    total_paid: float
+    total_costs: float
+    margin: float
+    margin_percent: float
+    change_order_total: float
+    change_order_count: int
+    crew: Optional[str]
+    start_date: Optional[date]
+    estimated_end_date: Optional[date]
+    actual_end_date: Optional[date]
+    site_address: Optional[str]
+    site_city: Optional[str]
+    site_state: Optional[str]
+    site_zip: Optional[str]
+    hubspot_deal_id: Optional[str]
+    stripe_customer_id: Optional[str]
+    notes: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- Payment Schemas ---
+
+class PaymentResponse(BaseModel):
+    id: str
+    job_id: str
+    change_order_id: Optional[str]
+    payment_type: str
+    status: str
+    amount: float
+    currency: str
+    processor: str
+    stripe_payment_intent_id: Optional[str]
+    stripe_checkout_session_id: Optional[str]
+    stripe_charge_id: Optional[str]
+    paid_at: Optional[datetime]
+    failed_at: Optional[datetime]
+    description: Optional[str]
+    reference_number: Optional[str]
+    client_name: Optional[str]
+    client_email: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- Change Order (AWO) Schemas ---
+
+class ChangeOrderCreate(BaseModel):
+    job_id: str
+    title: str = Field(..., max_length=255)
+    description: Optional[str] = None
+    reason: str = "client_request"
+    labor_cost: float = 0.0
+    material_cost: float = 0.0
+    markup_percent: float = 0.0
+    schedule_impact_days: int = 0
+    requires_deposit: bool = False
+    deposit_percent: float = 0.0
+
+
+class ChangeOrderUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    reason: Optional[str] = None
+    status: Optional[str] = None
+    labor_cost: Optional[float] = None
+    material_cost: Optional[float] = None
+    markup_percent: Optional[float] = None
+    schedule_impact_days: Optional[int] = None
+    requires_deposit: Optional[bool] = None
+    deposit_percent: Optional[float] = None
+
+
+class ChangeOrderResponse(BaseModel):
+    id: str
+    job_id: str
+    change_order_number: str
+    sequence: int
+    status: str
+    title: str
+    description: Optional[str]
+    reason: str
+    labor_cost: float
+    material_cost: float
+    markup_percent: float
+    markup_amount: float
+    total_amount: float
+    schedule_impact_days: int
+    requires_deposit: bool
+    deposit_percent: float
+    deposit_amount: float
+    approved_by: Optional[str]
+    approved_at: Optional[datetime]
+    amount_paid: float
+    fully_paid: bool
+    ai_suggested: bool
+    ai_suggestion_reason: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # --- Sync Schemas ---
 
 class SyncRequest(BaseModel):
