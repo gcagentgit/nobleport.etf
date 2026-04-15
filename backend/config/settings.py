@@ -40,6 +40,25 @@ class Settings(BaseSettings):
     # Redis (for Celery task queue)
     redis_url: str = "redis://localhost:6379/0"
 
+    # Stripe Integration
+    stripe_secret_key: Optional[str] = None
+    stripe_publishable_key: Optional[str] = None
+    stripe_webhook_secret: Optional[str] = None
+    stripe_success_url: str = "http://localhost:3000/payment/success"
+    stripe_cancel_url: str = "http://localhost:3000/payment/cancel"
+    stripe_default_deposit_percent: float = 30.0
+
+    # HubSpot Integration
+    hubspot_api_key: Optional[str] = None
+    hubspot_access_token: Optional[str] = None
+    hubspot_portal_id: Optional[str] = None
+    hubspot_pipeline_id: Optional[str] = None
+    hubspot_sync_enabled: bool = False
+    hubspot_sync_interval_minutes: int = 10
+
+    # Database (Postgres-first, SQLite fallback for dev only)
+    postgres_url: Optional[str] = None
+
     # Buildertrend Integration
     buildertrend_base_url: str = "https://api.buildertrend.com/v1"
     buildertrend_api_key: Optional[str] = None

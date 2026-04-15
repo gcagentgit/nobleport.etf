@@ -19,9 +19,16 @@ from backend.api.invoices import router as invoices_router
 from backend.api.buildertrend import router as buildertrend_router
 from backend.api.sync import router as sync_router
 from backend.api.bridge import router as bridge_router
+from backend.api.estimates import router as estimates_router
+from backend.api.jobs import router as jobs_router
+from backend.api.payments import router as payments_router
+from backend.api.change_orders import router as change_orders_router
+from backend.api.revenue import router as revenue_router
 from backend.config.database import init_db
 from backend.config.settings import settings
 from backend.services.sync_engine import SyncEngine
+from backend.services.hubspot_sync import HubSpotSyncService
+import backend.models  # noqa: F401 - ensure all models registered with Base
 
 
 @asynccontextmanager
@@ -32,13 +39,21 @@ async def lifespan(app: FastAPI):
     sync_engine = SyncEngine()
     app.state.sync_engine = sync_engine
 
+    hubspot_sync = HubSpotSyncService()
+    app.state.hubspot_sync = hubspot_sync
+
     if settings.buildertrend_sync_mode.value == "scheduled":
         await sync_engine.start_scheduled_sync()
+
+    if settings.hubspot_sync_enabled:
+        await hubspot_sync.start_scheduled_sync()
 
     yield
 
     if hasattr(app.state, "sync_engine"):
         await app.state.sync_engine.stop()
+    if hasattr(app.state, "hubspot_sync"):
+        await app.state.hubspot_sync.stop()
 
 
 app = FastAPI(
@@ -71,6 +86,11 @@ app.include_router(invoices_router, prefix="/api/invoices", tags=["Invoices"])
 app.include_router(buildertrend_router, prefix="/api/buildertrend", tags=["Buildertrend"])
 app.include_router(sync_router, prefix="/api/sync", tags=["Sync"])
 app.include_router(bridge_router, prefix="/api/bridge", tags=["NoblePort Bridge"])
+app.include_router(estimates_router, prefix="/api/estimates", tags=["Estimates"])
+app.include_router(jobs_router, prefix="/api/jobs", tags=["Jobs"])
+app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
+app.include_router(change_orders_router, prefix="/api/change-orders", tags=["Change Orders (AWO)"])
+app.include_router(revenue_router, prefix="/api/revenue", tags=["Revenue Engine"])
 
 
 if __name__ == "__main__":
