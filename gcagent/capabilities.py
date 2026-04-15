@@ -1,9 +1,14 @@
-"""Skill registry for GCagent.ai.
+"""Skill registry for GCagent.ai (v1.1).
 
-Loads the declarative manifest in `skills.yaml` and exposes typed accessors
-plus a system-prompt renderer. Intentionally dependency-light: falls back to a
-minimal YAML parser shim if PyYAML is unavailable, so this module can be
-imported in sandboxed environments.
+Loads the three-file declarative registry under `gcagent/config/`:
+
+- `capability_layers.yaml` — six-layer taxonomy (architecture, execution,
+  knowledge, platform, quality, domain).
+- `skill_registry.yaml`    — twelve core skills with full contracts.
+- `module_registry.yaml`   — domain modules composing core skills.
+
+Exposes typed accessors, contract validation, and a system-prompt renderer.
+Dependency-light: requires only PyYAML.
 """
 
 from __future__ import annotations
@@ -18,32 +23,70 @@ except ImportError:  # pragma: no cover
     yaml = None  # type: ignore
 
 
-MANIFEST_PATH = Path(__file__).parent / "skills.yaml"
-SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
+PACKAGE_ROOT = Path(__file__).parent
+CONFIG_DIR = PACKAGE_ROOT / "config"
+SYSTEM_PROMPT_PATH = PACKAGE_ROOT / "system_prompt.md"
+
+LAYERS_PATH = CONFIG_DIR / "capability_layers.yaml"
+SKILLS_PATH = CONFIG_DIR / "skill_registry.yaml"
+MODULES_PATH = CONFIG_DIR / "module_registry.yaml"
+OUTPUT_MODES_PATH = CONFIG_DIR / "output_modes.yaml"
+
+
+# ---------------------------------------------------------------------------
+# Dataclasses
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CapabilityLayer:
+    id: str
+    name: str
+    description: str
+    skills: tuple[str, ...] = ()
+    modules: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class Skill:
-    """A single core capability."""
+    """Core skill contract. Mirrors `skill_contract.required_fields`."""
 
     id: str
     name: str
-    summary: str
-    competencies: tuple[str, ...] = ()
-    patterns: tuple[str, ...] = ()
-    frameworks: tuple[str, ...] = ()
-    integrations: tuple[str, ...] = ()
-    stores: tuple[str, ...] = ()
-    outputs: tuple[str, ...] = ()
+    purpose: str
+    capabilities: tuple[str, ...]
+    inputs: tuple[str, ...]
+    outputs: tuple[str, ...]
+    dependencies: tuple[str, ...]
+    safety_rules: tuple[str, ...]
+    success_criteria: tuple[str, ...]
+    failure_modes: tuple[str, ...]
+    layer: str = ""  # populated from capability_layers.yaml
 
 
 @dataclass(frozen=True)
-class SkillModule:
-    """A pluggable, domain-specific skill module composed from core skills."""
+class DomainModule:
+    """Domain module contract. Mirrors `module_contract.required_fields`."""
 
     id: str
     name: str
-    requires: tuple[str, ...]
+    purpose: str
+    capabilities: tuple[str, ...]
+    inputs: tuple[str, ...]
+    outputs: tuple[str, ...]
+    required_skills: tuple[str, ...]
+    dependencies: tuple[str, ...]
+    safety_rules: tuple[str, ...]
+    success_criteria: tuple[str, ...]
+    failure_modes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class OutputMode:
+    id: str
+    name: str
+    description: str
+    produced_by: tuple[str, ...]
 
 
 @dataclass
@@ -51,31 +94,59 @@ class SkillRegistry:
     agent_name: str
     agent_version: str
     agent_role: str
-    core_skills: dict[str, Skill] = field(default_factory=dict)
-    modules: dict[str, SkillModule] = field(default_factory=dict)
-    capability_tags: tuple[str, ...] = ()
+    layers: dict[str, CapabilityLayer] = field(default_factory=dict)
+    skills: dict[str, Skill] = field(default_factory=dict)
+    modules: dict[str, DomainModule] = field(default_factory=dict)
+    output_modes: dict[str, OutputMode] = field(default_factory=dict)
 
-    def has(self, skill_id: str) -> bool:
-        return skill_id in self.core_skills
+    # --- lookups ----------------------------------------------------------
+
+    def has_skill(self, skill_id: str) -> bool:
+        return skill_id in self.skills
+
+    def has_module(self, module_id: str) -> bool:
+        return module_id in self.modules
+
+    def skills_in_layer(self, layer_id: str) -> list[Skill]:
+        layer = self.layers[layer_id]
+        return [self.skills[sid] for sid in layer.skills if sid in self.skills]
 
     def resolve_module(self, module_id: str) -> list[Skill]:
-        """Return the core skills required by a module, in declared order."""
+        """Return the core skills a domain module requires, in declared order."""
         module = self.modules[module_id]
-        missing = [r for r in module.requires if r not in self.core_skills]
+        missing = [s for s in module.required_skills if s not in self.skills]
         if missing:
             raise ValueError(
                 f"Module '{module_id}' requires unknown skills: {missing}"
             )
-        return [self.core_skills[r] for r in module.requires]
+        return [self.skills[s] for s in module.required_skills]
 
-    def skills(self) -> Iterable[Skill]:
-        return self.core_skills.values()
+    def capability_tags(self) -> tuple[str, ...]:
+        """Flat list of skill IDs — back-compat with the v1.0 capability list."""
+        return tuple(self.skills.keys())
+
+
+# ---------------------------------------------------------------------------
+# Loaders
+# ---------------------------------------------------------------------------
+
+
+_SKILL_REQUIRED = (
+    "id", "name", "purpose", "capabilities", "inputs", "outputs",
+    "dependencies", "safety_rules", "success_criteria", "failure_modes",
+)
+
+_MODULE_REQUIRED = (
+    "id", "name", "purpose", "capabilities", "inputs", "outputs",
+    "required_skills", "dependencies", "safety_rules", "success_criteria",
+    "failure_modes",
+)
 
 
 def _load_yaml(path: Path) -> dict:
     if yaml is None:  # pragma: no cover
         raise RuntimeError(
-            "PyYAML is required to load the GCagent skill manifest. "
+            "PyYAML is required to load the GCagent skill registry. "
             "Install with `pip install pyyaml`."
         )
     with path.open("r", encoding="utf-8") as fh:
@@ -88,42 +159,116 @@ def _as_tuple(value) -> tuple[str, ...]:
     return tuple(str(v) for v in value)
 
 
-def load_registry(path: Path | str | None = None) -> SkillRegistry:
-    """Parse `skills.yaml` into a typed SkillRegistry."""
-    manifest_path = Path(path) if path else MANIFEST_PATH
-    data = _load_yaml(manifest_path)
+def _validate_contract(entry: dict, required: tuple[str, ...], kind: str) -> None:
+    missing = [f for f in required if f not in entry]
+    if missing:
+        raise ValueError(
+            f"{kind} '{entry.get('id', '<unknown>')}' missing required fields: {missing}"
+        )
 
-    agent = data.get("agent", {})
+
+def load_registry(config_dir: Path | str | None = None) -> SkillRegistry:
+    """Parse the three-file registry into a typed SkillRegistry."""
+    base = Path(config_dir) if config_dir else CONFIG_DIR
+    layers_data = _load_yaml(base / "capability_layers.yaml")
+    skills_data = _load_yaml(base / "skill_registry.yaml")
+    modules_data = _load_yaml(base / "module_registry.yaml")
+    output_modes_data = _load_yaml(base / "output_modes.yaml")
+
     registry = SkillRegistry(
-        agent_name=agent.get("name", "GCagent.ai"),
-        agent_version=str(agent.get("version", "0.0.0")),
-        agent_role=agent.get("role", "").strip(),
-        capability_tags=_as_tuple(data.get("capabilities")),
+        agent_name="GCagent.ai",
+        agent_version=str(layers_data.get("version", "1.1")),
+        agent_role=(
+            "Technical collaborator for agentic systems and operational workflows."
+        ),
     )
 
-    for entry in data.get("core_skills", []) or []:
+    # Layers
+    for entry in layers_data.get("layers", []) or []:
+        layer = CapabilityLayer(
+            id=entry["id"],
+            name=entry["name"],
+            description=entry.get("description", "").strip(),
+            skills=_as_tuple(entry.get("skills")),
+            modules=_as_tuple(entry.get("modules")),
+        )
+        registry.layers[layer.id] = layer
+
+    # Skills (contract-validated)
+    skill_layer_index = {
+        sid: layer.id
+        for layer in registry.layers.values()
+        for sid in layer.skills
+    }
+    for entry in skills_data.get("skills", []) or []:
+        _validate_contract(entry, _SKILL_REQUIRED, "Skill")
         skill = Skill(
             id=entry["id"],
             name=entry["name"],
-            summary=entry.get("summary", ""),
-            competencies=_as_tuple(entry.get("competencies")),
-            patterns=_as_tuple(entry.get("patterns")),
-            frameworks=_as_tuple(entry.get("frameworks")),
-            integrations=_as_tuple(entry.get("integrations")),
-            stores=_as_tuple(entry.get("stores")),
-            outputs=_as_tuple(entry.get("outputs")),
+            purpose=entry["purpose"].strip(),
+            capabilities=_as_tuple(entry["capabilities"]),
+            inputs=_as_tuple(entry["inputs"]),
+            outputs=_as_tuple(entry["outputs"]),
+            dependencies=_as_tuple(entry["dependencies"]),
+            safety_rules=_as_tuple(entry["safety_rules"]),
+            success_criteria=_as_tuple(entry["success_criteria"]),
+            failure_modes=_as_tuple(entry["failure_modes"]),
+            layer=skill_layer_index.get(entry["id"], ""),
         )
-        registry.core_skills[skill.id] = skill
+        registry.skills[skill.id] = skill
 
-    for entry in data.get("skill_modules", []) or []:
-        module = SkillModule(
+    # Modules (contract-validated; skills checked)
+    for entry in modules_data.get("modules", []) or []:
+        _validate_contract(entry, _MODULE_REQUIRED, "Module")
+        module = DomainModule(
             id=entry["id"],
             name=entry["name"],
-            requires=_as_tuple(entry.get("requires")),
+            purpose=entry["purpose"].strip(),
+            capabilities=_as_tuple(entry["capabilities"]),
+            inputs=_as_tuple(entry["inputs"]),
+            outputs=_as_tuple(entry["outputs"]),
+            required_skills=_as_tuple(entry["required_skills"]),
+            dependencies=_as_tuple(entry["dependencies"]),
+            safety_rules=_as_tuple(entry["safety_rules"]),
+            success_criteria=_as_tuple(entry["success_criteria"]),
+            failure_modes=_as_tuple(entry["failure_modes"]),
         )
+        unknown = [s for s in module.required_skills if s not in registry.skills]
+        if unknown:
+            raise ValueError(
+                f"Module '{module.id}' references unknown skills: {unknown}"
+            )
         registry.modules[module.id] = module
 
+    # Cross-check: layers reference known skills/modules
+    for layer in registry.layers.values():
+        for sid in layer.skills:
+            if sid not in registry.skills:
+                raise ValueError(
+                    f"Layer '{layer.id}' references unknown skill: {sid}"
+                )
+        for mid in layer.modules:
+            if mid not in registry.modules:
+                raise ValueError(
+                    f"Layer '{layer.id}' references unknown module: {mid}"
+                )
+
+    # Output modes
+    for entry in output_modes_data.get("output_modes", []) or []:
+        mode = OutputMode(
+            id=entry["id"],
+            name=entry["name"],
+            description=entry.get("description", "").strip(),
+            produced_by=_as_tuple(entry.get("produced_by")),
+        )
+        registry.output_modes[mode.id] = mode
+
     return registry
+
+
+# ---------------------------------------------------------------------------
+# Prompt rendering
+# ---------------------------------------------------------------------------
 
 
 def render_system_prompt(
@@ -131,9 +276,9 @@ def render_system_prompt(
     *,
     include_modules: Iterable[str] = (),
 ) -> str:
-    """Render the GCagent system prompt, optionally appending module sections.
+    """Render the GCagent system prompt, optionally appending module detail.
 
-    The base prompt lives in `system_prompt.md`. Requested modules are
+    The base prompt lives in `system_prompt.md`. Requested domain modules are
     resolved against the registry and appended as a "Loaded modules" block.
     """
     registry = registry or load_registry()
@@ -143,18 +288,39 @@ def render_system_prompt(
     if not modules:
         return base
 
+    unknown = [m for m in modules if m not in registry.modules]
+    if unknown:
+        raise ValueError(f"Unknown domain modules: {unknown}")
+
     lines = ["", "## Loaded modules", ""]
     for module_id in modules:
         module = registry.modules[module_id]
-        requires = ", ".join(f"`{r}`" for r in module.requires)
-        lines.append(f"- **{module.name}** (`{module.id}`) — requires {requires}.")
-    return base.rstrip() + "\n" + "\n".join(lines) + "\n"
+        required = ", ".join(f"`{r}`" for r in module.required_skills)
+        lines.append(f"### {module.name} (`{module.id}`)")
+        lines.append("")
+        lines.append(module.purpose)
+        lines.append("")
+        lines.append(f"**Requires:** {required}")
+        lines.append("")
+    return base.rstrip() + "\n" + "\n".join(lines).rstrip() + "\n"
+
+
+# ---------------------------------------------------------------------------
+# CLI sanity check
+# ---------------------------------------------------------------------------
 
 
 if __name__ == "__main__":  # pragma: no cover
     reg = load_registry()
     print(f"{reg.agent_name} v{reg.agent_version}")
-    print(f"Core skills: {len(reg.core_skills)}")
-    print(f"Modules:     {len(reg.modules)}")
-    for skill in reg.skills():
-        print(f"  - {skill.id}: {skill.name}")
+    print(f"Layers:       {len(reg.layers)}")
+    print(f"Core skills:  {len(reg.skills)}")
+    print(f"Domain modules: {len(reg.modules)}")
+    print(f"Output modes: {len(reg.output_modes)}")
+    print()
+    for layer in reg.layers.values():
+        members = layer.skills or layer.modules
+        kind = "skills" if layer.skills else "modules"
+        print(f"  [{layer.id}] {layer.name} — {len(members)} {kind}")
+        for m in members:
+            print(f"      - {m}")

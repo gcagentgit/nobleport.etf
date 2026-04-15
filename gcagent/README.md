@@ -1,58 +1,112 @@
-# GCagent.ai — Skill Framework
+# GCagent.ai — Skill Framework (v1.1)
 
-A structured, declarative skill framework for **GCagent.ai**, the technical
-collaborator agent used across the Noble Port ecosystem.
+Canonical capability model for **GCagent.ai**, the technical collaborator
+agent used across the Noble Port ecosystem.
 
-This module is the source of truth for:
+v1.1 promotes the framework from a flat registry to a **layered model** with
+three separate sources of truth, a **four-block system prompt contract**, and
+**first-class domain modules** that align the agent with actual product use
+cases instead of leaving it as a generic engineering assistant.
 
-- **What GCagent can do** — core capabilities and pluggable skill modules.
-- **How GCagent presents itself** — drop-in system prompt for OpenAI,
-  Anthropic, or LangChain-style runtimes.
-- **How callers route tasks** — short capability tags consumed by orchestrators.
+## What's in v1.1
+
+1. **Layered taxonomy.** Six capability layers — architecture, execution,
+   knowledge, platform, quality, domain — give every skill a home and map
+   cleanly to code packages, permissions, and roadmap tagging.
+2. **Three-file registry.** `capability_layers.yaml`, `skill_registry.yaml`,
+   and `module_registry.yaml` split the three concerns. Each skill and module
+   satisfies an explicit contract (purpose, inputs, outputs, dependencies,
+   safety rules, success criteria, failure modes).
+3. **Domain modules.** Five product-specific operating modes compose core
+   skills into real Noble Port workflows (construction ops, internal ops,
+   compliance docs, reporting, investor admin).
+4. **Four-block system prompt.** Role / competency registry / behavior rules
+   / output contract — composable and independently testable.
+5. **Module map.** Every skill and module has a corresponding code package
+   under the appropriate layer directory, ready for implementation.
 
 ## Layout
 
 ```
 gcagent/
-├── README.md            # this file
-├── skills.yaml          # declarative capability manifest
-├── system_prompt.md     # drop-in system prompt
-├── capabilities.py      # Python registry + prompt renderer
+├── README.md
 ├── __init__.py
-└── modules/             # reserved for per-module scaffolds
+├── capabilities.py               # typed registry + prompt renderer
+├── system_prompt.md              # four-block drop-in prompt
+│
+├── config/                       # machine-readable source of truth
+│   ├── capability_layers.yaml
+│   ├── skill_registry.yaml
+│   ├── module_registry.yaml
+│   └── output_modes.yaml
+│
+├── core/                         # architecture layer
+│   ├── agent_architecture/
+│   ├── prompt_engineering/
+│   └── reliability_safety/
+│
+├── execution/                    # execution layer
+│   ├── tool_integration/
+│   ├── workflow_orchestration/
+│   └── workflow_automation/
+│
+├── knowledge/                    # knowledge layer
+│   ├── memory_management/
+│   └── rag_systems/
+│
+├── platform/                     # platform layer
+│   ├── backend_infrastructure/
+│   └── developer_experience/
+│
+├── quality/                      # quality layer
+│   ├── debugging_observability/
+│   └── performance_optimization/
+│
+└── domains/                      # domain layer
+    ├── construction_operations/
+    ├── internal_ops_assistant/
+    ├── compliance_documentation/
+    ├── reporting_automation/
+    └── investor_admin_workflows/
 ```
 
-## Core skills
+## Canonical metadata
 
-Twelve always-on capabilities defined in `skills.yaml`:
+```yaml
+agent_name: GCagent.ai
+version: 1.1
+role: Technical collaborator for agentic systems
 
-| Tag                         | Focus                                                   |
-|-----------------------------|---------------------------------------------------------|
-| `agent_architecture`        | Single- and multi-agent design, roles, comms.           |
-| `tool_integration`          | Function/tool calling, schemas, routing, auth.          |
-| `workflow_orchestration`    | LangChain, LangGraph, AutoGen, CrewAI, custom.          |
-| `memory_management`         | Short-/long-term memory, vector stores, windowing.      |
-| `rag_systems`               | Ingestion, chunking, hybrid retrieval, grounding.       |
-| `debugging_observability`   | Traces, evals, regression testing.                      |
-| `prompt_engineering`        | System prompts, few-shot, guardrails, modularization.   |
-| `backend_infrastructure`    | APIs, queues, containers, serverless, k8s.              |
-| `reliability_safety`        | Validation, rate limits, fallbacks, safe completion.    |
-| `performance_optimization`  | Token, latency, caching, model selection.               |
-| `workflow_automation`       | Autonomous pipelines, cron/event, HITL.                 |
-| `developer_experience`      | Boilerplate, refactors, code review.                    |
+capabilities:
+  - agent_architecture
+  - tool_integration
+  - workflow_orchestration
+  - memory_management
+  - rag_systems
+  - debugging_observability
+  - prompt_engineering
+  - backend_infrastructure
+  - reliability_safety
+  - performance_optimization
+  - workflow_automation
+  - developer_experience
 
-## Skill modules (pluggable)
+focus_modules:
+  - construction_operations
+  - internal_ops_assistant
+  - reporting_automation
+  - compliance_documentation
+  - investor_admin_workflows
 
-Domain-specific extensions declared in `skills.yaml` under `skill_modules`.
-Each module names the core skills it requires, so callers can validate that
-a target runtime is provisioned before loading the module.
-
-- `multi_agent_negotiation`
-- `autonomous_research`
-- `code_generation`
-- `devops_automation`
-- `customer_support`
-- `internal_knowledgebase`
+preferred_outputs:
+  - architecture_spec
+  - system_prompt
+  - workflow_graph
+  - module_map
+  - tool_schema
+  - repo_scaffold
+  - evaluation_plan
+```
 
 ## Usage
 
@@ -63,8 +117,11 @@ from gcagent import load_registry
 
 reg = load_registry()
 print(reg.agent_name, reg.agent_version)
-for skill in reg.skills():
-    print(skill.id, "-", skill.name)
+
+# Walk the layered taxonomy
+for layer in reg.layers.values():
+    members = layer.skills or layer.modules
+    print(f"[{layer.id}] {layer.name} — {len(members)} members")
 ```
 
 ### Render the system prompt
@@ -74,37 +131,76 @@ from gcagent import load_registry, render_system_prompt
 
 reg = load_registry()
 
-# Base prompt only
+# Base prompt only (role + competency registry + behavior rules + output contract)
 prompt = render_system_prompt(reg)
 
-# Base prompt + resolved module sections
-prompt = render_system_prompt(reg, include_modules=["autonomous_research"])
+# Base prompt + resolved domain modules appended as a "Loaded modules" section
+prompt = render_system_prompt(
+    reg,
+    include_modules=["construction_operations", "reporting_automation"],
+)
 ```
 
-### Validate a module's requirements
+### Resolve a module's required skills
 
 ```python
 from gcagent import load_registry
 
 reg = load_registry()
-required_skills = reg.resolve_module("devops_automation")
-# -> [Skill(backend_infrastructure), Skill(workflow_automation), Skill(reliability_safety)]
+required = reg.resolve_module("compliance_documentation")
+# -> [Skill(rag_systems), Skill(prompt_engineering), Skill(reliability_safety), Skill(debugging_observability)]
 ```
 
-## Extending
+### Inspect a layer
 
-1. Add a new entry under `core_skills` or `skill_modules` in `skills.yaml`.
-2. If the module needs runtime scaffolding (sub-agents, tools, prompts),
-   create a package under `gcagent/modules/<module_id>/`.
-3. Re-run `python -m gcagent.capabilities` to sanity-check the manifest.
+```python
+from gcagent import load_registry
+
+reg = load_registry()
+for skill in reg.skills_in_layer("execution"):
+    print(skill.id, "-", skill.purpose)
+```
+
+## Skill contract
+
+Every entry in `skill_registry.yaml` must satisfy:
+
+| Field | Meaning |
+|---|---|
+| `id` | Stable, lowercase identifier used everywhere. |
+| `name` | Human-readable name. |
+| `purpose` | One-sentence statement of intent. |
+| `capabilities` | Competencies this skill exercises. |
+| `inputs` | What callers must supply. |
+| `outputs` | What the skill produces. |
+| `dependencies` | Other skills this skill composes on top of. |
+| `safety_rules` | Non-negotiable rules enforced at runtime. |
+| `success_criteria` | What "done well" looks like. |
+| `failure_modes` | Known failure shapes to detect and prevent. |
+
+Domain modules follow an analogous `module_contract` with `required_skills`
+and cross-system `dependencies` (e.g., specific files under `backend/`).
+
+The loader in `capabilities.py` validates these contracts on every load —
+missing fields or unknown skill references fail loudly.
+
+## Adding a new capability
+
+1. Add the skill under `config/skill_registry.yaml` with the full contract.
+2. Assign it to a layer in `config/capability_layers.yaml`.
+3. Create a code package under `gcagent/<layer>/<skill_id>/` for runtime
+   scaffolding.
+4. If any domain module needs it, add it to that module's `required_skills`.
+5. Run `python -m gcagent.capabilities` to validate the registry loads.
 
 ## Design notes
 
-- The manifest is **declarative-first**. Python types in `capabilities.py`
-  mirror the YAML rather than the other way around, so non-Python callers
-  (Node, shell scripts, CI jobs) can consume the same source of truth.
-- Modules declare `requires:` against core skill IDs. This keeps composition
-  explicit and lets orchestrators refuse to load a module on a runtime that
-  lacks the underlying capability.
-- The system prompt is kept in Markdown, not Python string literals, so it can
-  be reviewed, diffed, and edited without touching code.
+- **Declarative first.** YAML is the source of truth; Python types mirror it
+  so non-Python callers (Node, shell, CI) can consume the same registry.
+- **Contract enforced.** `load_registry()` validates every skill and module
+  against its required fields before handing back a registry instance.
+- **Prompt in Markdown, structured in blocks.** `system_prompt.md` is four
+  labeled sections so individual blocks can be edited, reviewed, and tested
+  without touching the others.
+- **Module map is code, not prose.** Every skill and module has a real
+  package path where runtime scaffolding, sub-agents, and tools will land.
