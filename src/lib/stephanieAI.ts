@@ -477,9 +477,10 @@ export class StephanieAI {
 
     this.provider = new ethers.JsonRpcProvider(providerUrl);
 
-    // Initialize DID resolver
+    // ens-did-resolver expects an ethers v5 Provider; cast through any for v6 compat
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ensResolver = getEnsResolver({
-      networks: [{ name: 'mainnet', provider: this.provider }]
+      networks: [{ name: 'mainnet', provider: this.provider as any }]
     });
     this.resolver = new Resolver(ensResolver);
 
