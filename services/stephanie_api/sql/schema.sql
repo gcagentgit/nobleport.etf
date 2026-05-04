@@ -91,3 +91,38 @@ BEGIN
         FOR EACH ROW EXECUTE FUNCTION update_updated_at();
     END IF;
 END$$;
+
+-- ─── Voice Sessions ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS voice_sessions (
+    id              UUID PRIMARY KEY,
+    started_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ended_at        TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_voice_sessions_started ON voice_sessions(started_at DESC);
+
+-- ─── Transcripts ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS transcripts (
+    id              SERIAL PRIMARY KEY,
+    session_id      UUID NOT NULL REFERENCES voice_sessions(id),
+    speaker         TEXT NOT NULL,
+    text            TEXT NOT NULL,
+    confidence      REAL NOT NULL DEFAULT 1.0,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_transcripts_session ON transcripts(session_id);
+CREATE INDEX IF NOT EXISTS idx_transcripts_created ON transcripts(created_at DESC);
+
+-- ─── Audit Hash Chain ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS audit_chain (
+    id              UUID PRIMARY KEY,
+    prev_hash       TEXT NOT NULL,
+    hash            TEXT NOT NULL,
+    entry           JSONB NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_chain_created ON audit_chain(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_chain_session ON audit_chain((entry->>'sessionId'));
+

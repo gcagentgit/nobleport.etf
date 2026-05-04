@@ -15,7 +15,8 @@
     "ioredis": "^5.4.0",
     "pg": "^8.13.0",
     "stripe": "^17.0.0",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -23,6 +24,7 @@
     "@types/node": "^20.0.0",
     "@types/pg": "^8.11.0",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   }
