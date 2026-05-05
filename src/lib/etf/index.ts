@@ -1,6 +1,8 @@
 export {
   ETF_TICKER,
   ETF_NAME,
+  ETF_ENS,
+  ETF_TREASURY,
   RegistrationType,
   AssetType,
 } from './types';

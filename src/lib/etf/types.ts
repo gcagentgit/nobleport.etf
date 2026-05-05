@@ -1,7 +1,11 @@
 // ─── Noble Port Real Estate ETF (Ticker: NBPT) ────────────────────
 
+import { NOBLEPORT_IDENTITY, NBPT_FUND_IDENTITY } from '../identity';
+
 export const ETF_TICKER = 'NBPT';
 export const ETF_NAME = 'Noble Port Real Estate ETF';
+export const ETF_ENS = NBPT_FUND_IDENTITY.ens;
+export const ETF_TREASURY = NOBLEPORT_IDENTITY.address;
 
 // ─── Traditional ETF Wrapper ──────────────────────────────────────
 
