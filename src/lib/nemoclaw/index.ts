@@ -9,58 +9,46 @@
  * @see §1-22 of the Nemoclaw v1 Execution Policy Specification
  */
 
-// ─── Types ─────────────────────────────────────────────────────────
+// ─── Runtime values (enums + consts) ───────────────────────────────
 export {
-  // Operating modes (§3)
   OperatingMode,
-  // Action classes (§4)
   ActionClass,
-  // Roles (§6)
   Role,
   APPROVAL_ROLES,
   PROPOSAL_CREATOR_ROLES,
-  // Approval thresholds (§5)
   ExposureTier,
-  ApprovalThreshold,
   APPROVAL_THRESHOLDS,
   RWA_EXECUTION_THRESHOLD,
-  // Proposals (§8)
   ProposalState,
+  DataSourcePrecedence,
+  CircuitBreakerTrigger,
+  KillSwitchScope,
+  IncidentSeverity,
+  AuditSnapshotPoint,
+  DEFAULT_FRESHNESS_CONFIG,
+} from './types';
+
+// ─── Type-only re-exports ──────────────────────────────────────────
+export type {
+  ApprovalThreshold,
   Proposal,
   ApprovalRecord,
   SimulationResult,
   ValidationResult,
   ValidationCheck,
-  // Data sources (§7)
-  DataSourcePrecedence,
   DataSource,
-  // Events (§9)
   NemoclawEvent,
-  // Signer gateway (§10)
   SignerPayload,
   SignerGatewayConfig,
-  // Position & exposure (§12)
   PositionLimits,
   ExposureConfig,
-  // Circuit breakers (§15)
-  CircuitBreakerTrigger,
   CircuitBreakerState,
-  KillSwitchScope,
   KillSwitchAction,
-  // Incidents (§18)
-  IncidentSeverity,
   Incident,
-  // Audit (§14)
-  AuditSnapshotPoint,
   AuditRecord,
-  // Freshness (§7.3)
   FreshnessConfig,
-  DEFAULT_FRESHNESS_CONFIG,
-  // Policy decision (§2.4)
   PolicyDecision,
-  // Emergency override (§16)
   EmergencyOverride,
-  // Reconciliation (§17)
   ReconciliationResult,
 } from './types';
 
