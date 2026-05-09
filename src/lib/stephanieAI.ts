@@ -478,8 +478,10 @@ export class StephanieAI {
     this.provider = new ethers.JsonRpcProvider(providerUrl);
 
     // Initialize DID resolver
+    // ens-did-resolver's Provider type is the ethers v5 shape; ethers v6
+    // JsonRpcProvider is structurally compatible at runtime.
     const ensResolver = getEnsResolver({
-      networks: [{ name: 'mainnet', provider: this.provider }]
+      networks: [{ name: 'mainnet', provider: this.provider as unknown as never }]
     });
     this.resolver = new Resolver(ensResolver);
 
