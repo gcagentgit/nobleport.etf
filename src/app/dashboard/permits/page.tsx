@@ -1,6 +1,6 @@
 import { Topbar } from '@/components/dashboard/Topbar';
 import { Panel } from '@/components/dashboard/Panel';
-import { fetchPermitForecast, fetchPermits } from '@/lib/dashboard/api';
+import { fetchPermits } from '@/lib/dashboard/api';
 import { fmtRelative } from '@/lib/dashboard/format';
 import type { Permit } from '@/lib/dashboard/types';
 
@@ -16,7 +16,8 @@ const STATUS_CLASS: Record<Permit['status'], string> = {
 };
 
 export default async function PermitsPage() {
-  const [permits, forecast] = await Promise.all([fetchPermits(), fetchPermitForecast()]);
+  const { data, source } = await fetchPermits();
+  const { permits, forecast } = data;
 
   const open = permits.filter((p) => !['issued', 'denied', 'expired'].includes(p.status));
   const stalled = permits.filter((p) => p.status === 'corrections' && p.ageDays > 14);
@@ -24,7 +25,7 @@ export default async function PermitsPage() {
 
   return (
     <>
-      <Topbar pageTitle="PermitStream · AHJ Workflows" />
+      <Topbar pageTitle="PermitStream · AHJ Workflows" source={source} />
       <main className="flex-1 space-y-4 px-4 py-4 sm:px-6 sm:py-6">
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Permits Open" value={String(open.length)} />

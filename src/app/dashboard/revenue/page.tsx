@@ -1,13 +1,7 @@
 import { Topbar } from '@/components/dashboard/Topbar';
 import { Panel } from '@/components/dashboard/Panel';
 import { PipelineFunnel } from '@/components/dashboard/PipelineFunnel';
-import {
-  fetchCashPosition,
-  fetchInvoices,
-  fetchPipeline,
-  fetchRevenueRules,
-  fetchStaleDeals,
-} from '@/lib/dashboard/api';
+import { fetchRevenue } from '@/lib/dashboard/api';
 import {
   fmtDateTime,
   fmtInt,
@@ -20,13 +14,8 @@ import {
 export const dynamic = 'force-dynamic';
 
 export default async function RevenueWarboard() {
-  const [pipeline, deals, invoices, cash, rules] = await Promise.all([
-    fetchPipeline(),
-    fetchStaleDeals(),
-    fetchInvoices(),
-    fetchCashPosition(),
-    fetchRevenueRules(),
-  ]);
+  const { data, source } = await fetchRevenue();
+  const { pipeline, deals, invoices, cash, rules } = data;
 
   const totalPipeline = pipeline.reduce((s, p) => s + p.value, 0);
   const totalDeposit = pipeline.find((s) => s.id === 'deposit');
@@ -39,7 +28,7 @@ export default async function RevenueWarboard() {
 
   return (
     <>
-      <Topbar pageTitle="Revenue Warboard" generatedAt={cash.asOf} />
+      <Topbar pageTitle="Revenue Warboard" generatedAt={cash.asOf} source={source} />
       <main className="flex-1 space-y-4 px-4 py-4 sm:px-6 sm:py-6">
         <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <Stat label="Pipeline (total)" value={fmtUSDCompact(totalPipeline)} hint="all stages" />

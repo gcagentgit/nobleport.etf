@@ -1,20 +1,18 @@
 import { Topbar } from '@/components/dashboard/Topbar';
 import { Panel } from '@/components/dashboard/Panel';
 import { VoiceConsole } from '@/components/dashboard/VoiceConsole';
-import { fetchVoiceSession, fetchVoiceTranscript } from '@/lib/dashboard/api';
+import { fetchVoice } from '@/lib/dashboard/api';
 import { fmtMs, fmtRelative } from '@/lib/dashboard/format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function VoicePage() {
-  const [session, transcript] = await Promise.all([
-    fetchVoiceSession(),
-    fetchVoiceTranscript(),
-  ]);
+  const { data, source } = await fetchVoice();
+  const { session, transcript } = data;
 
   return (
     <>
-      <Topbar pageTitle="Stephanie.ai · Live Console" />
+      <Topbar pageTitle="Stephanie.ai · Live Console" source={source} />
       <main className="flex-1 space-y-4 px-4 py-4 sm:px-6 sm:py-6">
         <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <Stat

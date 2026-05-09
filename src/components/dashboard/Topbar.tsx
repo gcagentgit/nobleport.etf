@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { DataSource } from '@/lib/dashboard/api';
+import { DataSourceBadge } from './DataSourceBadge';
 
 const fmt = (d: Date) =>
   d.toLocaleString('en-US', {
@@ -13,7 +15,15 @@ const fmt = (d: Date) =>
     timeZoneName: 'short',
   });
 
-export function Topbar({ pageTitle, generatedAt }: { pageTitle: string; generatedAt?: string }) {
+export function Topbar({
+  pageTitle,
+  generatedAt,
+  source,
+}: {
+  pageTitle: string;
+  generatedAt?: string;
+  source?: DataSource;
+}) {
   const [now, setNow] = useState<string>('');
   useEffect(() => {
     const tick = () => setNow(fmt(new Date()));
@@ -31,6 +41,7 @@ export function Topbar({ pageTitle, generatedAt }: { pageTitle: string; generate
         <h1 className="text-lg font-semibold text-ink-50">{pageTitle}</h1>
       </div>
       <div className="flex items-center gap-2">
+        {source && <DataSourceBadge source={source} />}
         {generatedAt && (
           <span className="hidden text-[11px] text-ink-400 sm:inline">
             data <span className="num">@ {new Date(generatedAt).toLocaleTimeString()}</span>

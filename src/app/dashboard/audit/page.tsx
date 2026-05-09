@@ -21,14 +21,15 @@ const STATUS_CLASS: Record<AuditEntry['status'], string> = {
 };
 
 export default async function AuditPage() {
-  const entries = await fetchAudit();
+  const { data, source } = await fetchAudit();
+  const { entries } = data;
 
   const anchored = entries.filter((e) => e.anchor).length;
   const human = entries.filter((e) => e.approval !== 'auto').length;
 
   return (
     <>
-      <Topbar pageTitle="Audit Chain Explorer" />
+      <Topbar pageTitle="Audit Chain Explorer" source={source} />
       <main className="flex-1 space-y-4 px-4 py-4 sm:px-6 sm:py-6">
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Entries (visible)" value={String(entries.length)} />

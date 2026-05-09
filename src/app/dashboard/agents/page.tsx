@@ -1,20 +1,21 @@
 import { Topbar } from '@/components/dashboard/Topbar';
 import { Panel } from '@/components/dashboard/Panel';
 import { HealthPill } from '@/components/dashboard/StatusPill';
-import { fetchAgents, fetchAgentSummary } from '@/lib/dashboard/api';
+import { fetchAgents } from '@/lib/dashboard/api';
 import { fmtMs, fmtPct, fmtRelative } from '@/lib/dashboard/format';
 import type { Agent } from '@/lib/dashboard/types';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AgentsPage() {
-  const [agents, summary] = await Promise.all([fetchAgents(), fetchAgentSummary()]);
+  const { data, source } = await fetchAgents();
+  const { agents, summary } = data;
 
   const families = Array.from(new Set(agents.map((a) => a.family)));
 
   return (
     <>
-      <Topbar pageTitle="AI Agent Mesh" />
+      <Topbar pageTitle="AI Agent Mesh" source={source} />
       <main className="flex-1 space-y-4 px-4 py-4 sm:px-6 sm:py-6">
         <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <Stat label="Agents" value={`${summary.healthy + summary.degraded + summary.unhealthy} / ${summary.total}`} hint="online / total" />

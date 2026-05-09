@@ -10,11 +10,11 @@ import { fmtDateTime, fmtRelative, fmtUSDCompact } from '@/lib/dashboard/format'
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardHome() {
-  const overview = await fetchOverview();
+  const { data: overview, source } = await fetchOverview();
 
   return (
     <>
-      <Topbar pageTitle="Executive Command" generatedAt={overview.generatedAt} />
+      <Topbar pageTitle="Executive Command" generatedAt={overview.generatedAt} source={source} />
       <main className="flex-1 space-y-4 px-4 py-4 sm:px-6 sm:py-6">
         {overview.alerts.length > 0 && <AlertBanner alerts={overview.alerts} />}
 

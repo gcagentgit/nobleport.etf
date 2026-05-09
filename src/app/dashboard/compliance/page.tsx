@@ -1,7 +1,7 @@
 import { Topbar } from '@/components/dashboard/Topbar';
 import { Panel } from '@/components/dashboard/Panel';
 import { SeverityPill } from '@/components/dashboard/StatusPill';
-import { fetchComplianceAlerts, fetchKillSwitches } from '@/lib/dashboard/api';
+import { fetchCompliance } from '@/lib/dashboard/api';
 import { fmtDateTime, fmtRelative } from '@/lib/dashboard/format';
 
 export const dynamic = 'force-dynamic';
@@ -16,10 +16,8 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 export default async function CompliancePage() {
-  const [alerts, switches] = await Promise.all([
-    fetchComplianceAlerts(),
-    fetchKillSwitches(),
-  ]);
+  const { data, source } = await fetchCompliance();
+  const { alerts, killSwitches: switches } = data;
 
   const open = alerts.filter((a) => !a.resolved);
   const critical = open.filter((a) => a.severity === 'critical').length;
@@ -28,7 +26,7 @@ export default async function CompliancePage() {
 
   return (
     <>
-      <Topbar pageTitle="Cyborg.ai · Compliance & Governance" />
+      <Topbar pageTitle="Cyborg.ai · Compliance & Governance" source={source} />
       <main className="flex-1 space-y-4 px-4 py-4 sm:px-6 sm:py-6">
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Open Alerts" value={String(open.length)} tone={open.length ? 'warn' : 'ok'} />

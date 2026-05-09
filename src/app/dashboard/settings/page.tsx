@@ -42,27 +42,42 @@ export default function SettingsPage() {
             </ul>
           </Panel>
 
-          <Panel title="API Surface" subtitle="reads served by FastAPI gateway">
+          <Panel
+            title="API Surface"
+            subtitle="reads served by FastAPI gateway · /api/v1/dashboard/*"
+          >
             <ul className="space-y-1 font-mono text-[12px] text-ink-300">
-              <li>GET /v1/dashboard/overview</li>
-              <li>GET /v1/dashboard/revenue/pipeline</li>
-              <li>GET /v1/dashboard/revenue/cash</li>
-              <li>GET /v1/dashboard/revenue/deals?status=stale</li>
-              <li>GET /v1/dashboard/revenue/invoices</li>
-              <li>GET /v1/dashboard/jobs</li>
-              <li>GET /v1/dashboard/permits</li>
-              <li>GET /v1/dashboard/permits/forecast</li>
-              <li>GET /v1/dashboard/agents</li>
-              <li>GET /v1/dashboard/compliance/alerts</li>
-              <li>GET /v1/dashboard/compliance/kill-switches</li>
-              <li>GET /v1/dashboard/audit?cursor=&limit=</li>
-              <li>WS&nbsp; /v1/voice/session/{'{sessionId}'}</li>
+              <li>GET /api/v1/dashboard/overview <span className="pill-warn">mixed</span></li>
+              <li>GET /api/v1/dashboard/revenue <span className="pill-ok">live</span></li>
+              <li>GET /api/v1/dashboard/jobs <span className="pill-ok">live</span></li>
+              <li>GET /api/v1/dashboard/permits <span className="pill-info">fixture</span></li>
+              <li>GET /api/v1/dashboard/agents <span className="pill-info">fixture</span></li>
+              <li>GET /api/v1/dashboard/compliance <span className="pill-info">fixture</span></li>
+              <li>GET /api/v1/dashboard/audit?limit=N <span className="pill-info">fixture</span></li>
+              <li>GET /api/v1/dashboard/voice <span className="pill-info">fixture</span></li>
+              <li>GET /api/v1/dashboard/health <span className="pill-ok">live</span></li>
             </ul>
             <p className="mt-3 text-[11px] text-ink-400">
-              Set <span className="num text-ink-200">NEXT_PUBLIC_DASHBOARD_API_BASE</span> to the
-              gateway URL and the dashboard reads will switch from local fixtures to live data
-              without UI changes.
+              Configure with <span className="num text-ink-200">DASHBOARD_API_BASE</span> (default
+              <span className="num text-ink-200"> http://localhost:8000/api/v1/dashboard</span>)
+              and optional <span className="num text-ink-200">DASHBOARD_API_TOKEN</span>. The
+              dashboard reads <em>only</em> from this gateway — no client-side fallbacks. Every
+              response carries an <span className="num text-ink-200">X-Data-Source</span> header
+              ({"live | mixed | fixture"}) which the topbar surfaces to the operator.
             </p>
+          </Panel>
+
+          <Panel title="Coverage" subtitle="what's wired live vs awaiting upstream">
+            <ul className="space-y-2 text-sm">
+              <Coverage label="Revenue · pipeline / cash / AR / rules" status="live" detail="RevenueEngine + Stephanie + invoices/payments tables" />
+              <Coverage label="Jobs · production schedule + GP" status="live" detail="jobs table + margin compression detector" />
+              <Coverage label="Executive Command KPIs" status="mixed" detail="revenue/jobs live; voice/permits/agents/compliance fixtures" />
+              <Coverage label="Permits · AHJ workflows" status="fixture" detail="awaiting PermitStream live API" />
+              <Coverage label="AI Agent Mesh" status="fixture" detail="awaiting LangGraph supervisor heartbeat feed" />
+              <Coverage label="Compliance · alerts + kill switches" status="fixture" detail="awaiting Cyborg.ai policy log" />
+              <Coverage label="Audit chain" status="fixture" detail="awaiting hash-linked audit store + Arbitrum anchor" />
+              <Coverage label="Voice console" status="fixture" detail="awaiting LiveKit + Stephanie session telemetry" />
+            </ul>
           </Panel>
 
           <Panel title="Webhooks & Realtime" subtitle="push surfaces to the dashboard">
@@ -150,6 +165,27 @@ function Integration({
     <li className="flex items-center justify-between rounded-md border border-ink-700 bg-ink-900/50 px-3 py-2">
       <div>
         <div className="font-medium text-ink-100">{name}</div>
+        <div className="text-[11px] text-ink-400">{detail}</div>
+      </div>
+      <span className={cls}>{status}</span>
+    </li>
+  );
+}
+
+function Coverage({
+  label,
+  status,
+  detail,
+}: {
+  label: string;
+  status: 'live' | 'mixed' | 'fixture';
+  detail: string;
+}) {
+  const cls = status === 'live' ? 'pill-ok' : status === 'mixed' ? 'pill-warn' : 'pill-info';
+  return (
+    <li className="flex items-center justify-between rounded-md border border-ink-700 bg-ink-900/50 px-3 py-2">
+      <div>
+        <div className="font-medium text-ink-100">{label}</div>
         <div className="text-[11px] text-ink-400">{detail}</div>
       </div>
       <span className={cls}>{status}</span>
