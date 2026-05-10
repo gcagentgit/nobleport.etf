@@ -20,6 +20,12 @@ pub const ETHEREUM_MAINNET_CHAIN_ID: u64 = 1;
 /// Minimum confirmation depth required before a transaction is considered final.
 pub const MIN_CONFIRMATION_DEPTH: u64 = 12;
 
+/// Maximum age (in seconds) for an ETH/USD price lock before it is rejected.
+pub const PRICE_LOCK_MAX_AGE_SECS: i64 = 300;
+
+/// Maximum timestamp drift (in seconds) tolerated for Stripe webhook signatures.
+pub const STRIPE_TIMESTAMP_TOLERANCE_SECS: i64 = 300;
+
 /// Base token rate in USD (price per token when no package discount applies).
 pub const BASE_TOKEN_RATE_USD: f64 = 0.50;
 
@@ -83,6 +89,28 @@ pub struct PaymentRecord {
     pub metadata: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// A payment confirmation returned after a successful payment.
+/// This is a type alias for [`PaymentRecord`] for API clarity.
+pub type PaymentConfirmation = PaymentRecord;
+
+// ---------------------------------------------------------------------------
+// Verified on-chain transaction
+// ---------------------------------------------------------------------------
+
+/// A verified on-chain (MetaMask) transaction with all security checks passed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerifiedTx {
+    pub tx_hash: String,
+    pub amount_wei: String,
+    pub amount_usd: f64,
+    pub recipient: String,
+    pub chain_id: u64,
+    pub block_number: u64,
+    pub confirmations: u64,
+    pub price_usd_at_lock: f64,
+    pub price_locked_at: DateTime<Utc>,
 }
 
 // ---------------------------------------------------------------------------

@@ -94,6 +94,18 @@ async fn verify_tx(
 ) -> (StatusCode, Json<VerifyTxResponse>) {
     let mut verifier = state.verifier.lock().await;
 
+    // Fast path: reject duplicates before making any RPC calls.
+    if verifier.is_processed(&body.tx_hash) {
+        return (
+            StatusCode::CONFLICT,
+            Json(VerifyTxResponse {
+                success: false,
+                data: None,
+                error: Some(common::PaymentError::ReplayDetected.to_string()),
+            }),
+        );
+    }
+
     match verifier.verify_transaction(&body.tx_hash).await {
         Ok(verified) => (
             StatusCode::OK,
