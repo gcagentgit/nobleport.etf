@@ -129,7 +129,7 @@ async fn get_tx_status(
     Path(hash): Path<String>,
 ) -> Json<TxStatusResponse> {
     let verifier = state.verifier.lock().await;
-    let processed = verifier.is_processed(&hash);
+    let processed = verifier.lookup(&hash).is_some();
     Json(TxStatusResponse {
         tx_hash: hash,
         processed,
