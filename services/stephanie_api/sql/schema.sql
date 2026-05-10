@@ -126,3 +126,46 @@ CREATE TABLE IF NOT EXISTS audit_chain (
 CREATE INDEX IF NOT EXISTS idx_audit_chain_created ON audit_chain(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_chain_session ON audit_chain((entry->>'sessionId'));
 
+-- ─── Payments ─────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS payments (
+    id              UUID PRIMARY KEY,
+    user_id         TEXT NOT NULL,
+    method          TEXT NOT NULL,
+    amount_usd      NUMERIC(12,2) NOT NULL,
+    tokens_credited INTEGER NOT NULL DEFAULT 0,
+    status          TEXT NOT NULL DEFAULT 'pending',
+    external_id     TEXT,
+    tx_hash         TEXT,
+    metadata        JSONB,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_payments_method ON payments(method);
+CREATE INDEX IF NOT EXISTS idx_payments_external ON payments(external_id);
+
+-- ─── Token Balances (NBPT) ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS token_balances (
+    user_id         TEXT PRIMARY KEY,
+    balance         INTEGER NOT NULL DEFAULT 0,
+    last_updated    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ─── Token Transactions ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS token_transactions (
+    id              UUID PRIMARY KEY,
+    user_id         TEXT NOT NULL,
+    type            TEXT NOT NULL,
+    amount          INTEGER NOT NULL,
+    reason          TEXT NOT NULL,
+    payment_id      UUID REFERENCES payments(id),
+    balance_after   INTEGER NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_tx_user ON token_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_token_tx_payment ON token_transactions(payment_id);
+CREATE INDEX IF NOT EXISTS idx_token_tx_created ON token_transactions(created_at DESC);
+
