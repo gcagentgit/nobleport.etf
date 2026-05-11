@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     nobleport_permit_contract_address: Optional[str] = None
     nobleport_approval_contract_address: Optional[str] = None
 
+    # 506(c) Investor Portal
+    investor_encryption_key: Optional[str] = None  # 64 hex chars (32 bytes AES-256)
+    investor_internal_token: Optional[str] = None  # Bearer token for intake endpoint
+    investor_admin_token: Optional[str] = None  # Bearer token for admin endpoints
+
     # Stephanie.ai MCP Connection
     stephanie_mcp_endpoint: str = "http://localhost:3100/mcp"
     stephanie_api_key: Optional[str] = None

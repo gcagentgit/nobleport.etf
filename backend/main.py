@@ -24,6 +24,8 @@ from backend.api.jobs import router as jobs_router
 from backend.api.payments import router as payments_router
 from backend.api.change_orders import router as change_orders_router
 from backend.api.revenue import router as revenue_router
+from backend.api.investor_intake import router as investor_intake_router
+from backend.api.investor_admin import router as investor_admin_router
 from backend.config.database import init_db
 from backend.config.settings import settings
 from backend.services.sync_engine import SyncEngine
@@ -91,6 +93,8 @@ app.include_router(jobs_router, prefix="/api/jobs", tags=["Jobs"])
 app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
 app.include_router(change_orders_router, prefix="/api/change-orders", tags=["Change Orders (AWO)"])
 app.include_router(revenue_router, prefix="/api/revenue", tags=["Revenue Engine"])
+app.include_router(investor_intake_router, prefix="/api/investor", tags=["506(c) Investor Intake"])
+app.include_router(investor_admin_router, prefix="/api/admin", tags=["506(c) Investor Admin"])
 
 
 if __name__ == "__main__":
