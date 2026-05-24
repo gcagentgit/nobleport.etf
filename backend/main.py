@@ -32,6 +32,7 @@ from backend.api.change_orders import router as change_orders_router
 from backend.api.revenue import router as revenue_router
 from backend.api.dashboard import router as dashboard_router
 from backend.api.typology import router as typology_router
+from backend.api.typology_engine import router as typology_engine_router
 from backend.config.database import init_db
 from backend.config.settings import settings
 from backend.services.sync_engine import SyncEngine
@@ -101,6 +102,7 @@ app.include_router(change_orders_router, prefix="/api/change-orders", tags=["Cha
 app.include_router(revenue_router, prefix="/api/revenue", tags=["Revenue Engine"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["Mission Control"])
 app.include_router(typology_router, prefix="/api/v1/typology", tags=["System Typology"])
+app.include_router(typology_engine_router, prefix="/api/v1/typology-engine", tags=["Typology Intelligence"])
 
 
 if __name__ == "__main__":

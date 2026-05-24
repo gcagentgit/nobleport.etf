@@ -25,6 +25,7 @@ export type OperationalLayer =
   | 'compliance'
   | 'governance'
   | 'ai_orchestration'
+  | 'typology_intelligence'
   | 'infrastructure'
   | 'audit'
   | 'client_experience';
@@ -72,6 +73,13 @@ export const LAYER_DEFINITIONS: LayerDefinition[] = [
     subtitle: 'Stephanie.ai Agent Mesh',
     systems: ['Stephanie.ai', 'GCagent.ai', 'PermitStream.ai', 'Cyborg.ai', 'DeepAgent'],
     health: 'degraded',
+  },
+  {
+    id: 'typology_intelligence',
+    name: 'Typology Intelligence',
+    subtitle: 'Structured Classification Engine',
+    systems: ['Classifier', 'Normalizer', 'Taxonomy Engine', 'Analytics'],
+    health: 'healthy',
   },
   {
     id: 'infrastructure',
@@ -325,6 +333,53 @@ export const SYSTEM_MODULES: SystemModule[] = [
     status: 'MODELED',
     health: 'healthy',
     description: 'Long-horizon research and diligence agent',
+    dependencies: [],
+  },
+
+  // ── Typology Intelligence Layer ──
+  {
+    id: 'typology-classifier',
+    name: 'Lead Classifier',
+    layer: 'typology_intelligence',
+    status: 'LIVE',
+    health: 'healthy',
+    description: 'Deterministic lead-to-archetype classification',
+    dependencies: ['fastapi'],
+  },
+  {
+    id: 'typology-normalizer',
+    name: 'Category Normalizer',
+    layer: 'typology_intelligence',
+    status: 'LIVE',
+    health: 'healthy',
+    description: 'Fuzzy label → canonical type normalization',
+    dependencies: [],
+  },
+  {
+    id: 'typology-taxonomy',
+    name: 'Taxonomy Engine',
+    layer: 'typology_intelligence',
+    status: 'LIVE',
+    health: 'healthy',
+    description: 'Hierarchical project/permit/contractor taxonomies',
+    dependencies: [],
+  },
+  {
+    id: 'typology-analytics',
+    name: 'Type Analytics',
+    layer: 'typology_intelligence',
+    status: 'LIVE',
+    health: 'healthy',
+    description: 'Entropy, coverage gaps, transition matrices',
+    dependencies: [],
+  },
+  {
+    id: 'typology-risk-collapse',
+    name: 'Risk Collapse Engine',
+    layer: 'typology_intelligence',
+    status: 'LIVE',
+    health: 'healthy',
+    description: 'Multi-factor risk → simple operational category',
     dependencies: [],
   },
 

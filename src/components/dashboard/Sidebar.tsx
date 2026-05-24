@@ -21,6 +21,10 @@ const PRIMARY: NavItem[] = [
   { href: '/dashboard/audit', label: 'Audit', hint: 'Hash-linked chain' },
 ];
 
+const ADMIN: NavItem[] = [
+  { href: '/dashboard/typology', label: 'Typology', hint: 'Classification engine' },
+];
+
 const SECONDARY: NavItem[] = [
   { href: '/dashboard/settings', label: 'Settings', hint: 'Operators · keys · webhooks' },
 ];
@@ -62,6 +66,11 @@ export function Sidebar() {
 
       <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
         {PRIMARY.map((item) => (
+          <NavLink key={item.href} item={item} active={isActive(item.href)} />
+        ))}
+        <div className="my-3 divider" />
+        <span className="px-3 text-[10px] uppercase tracking-widest text-ink-500">Admin</span>
+        {ADMIN.map((item) => (
           <NavLink key={item.href} item={item} active={isActive(item.href)} />
         ))}
         <div className="my-3 divider" />
