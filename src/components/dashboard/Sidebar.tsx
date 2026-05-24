@@ -11,6 +11,7 @@ interface NavItem {
 
 const PRIMARY: NavItem[] = [
   { href: '/dashboard', label: 'Command', hint: 'Executive overview' },
+  { href: '/dashboard/systems', label: 'Systems', hint: 'Typology · all layers' },
   { href: '/dashboard/revenue', label: 'Revenue', hint: 'Warboard · cash · AR' },
   { href: '/dashboard/jobs', label: 'Jobs', hint: 'GCagent · production' },
   { href: '/dashboard/permits', label: 'Permits', hint: 'PermitStream · AHJs' },

@@ -15,7 +15,7 @@
 export type Health = 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
 export type Severity = 'info' | 'warn' | 'critical';
 export type Trend = 'up' | 'down' | 'flat';
-export type DeploymentBadge = 'LIVE' | 'STAGED' | 'MODELED' | 'INTERNAL_R&D';
+export type DeploymentBadge = 'LIVE' | 'STAGED' | 'MODELED' | 'INTERNAL_R&D' | 'BLOCKED' | 'ARCHIVED';
 
 export interface KpiTile {
   id: string;
@@ -131,6 +131,7 @@ export interface Agent {
   lastHeartbeat: string;
   killSwitchArmed: boolean;
   currentTask?: string;
+  deploymentStatus?: DeploymentBadge;
 }
 
 export interface AgentMeshSummary {

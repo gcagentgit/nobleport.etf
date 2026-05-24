@@ -35,6 +35,8 @@ const deploymentStyles: Record<DeploymentBadge, string> = {
   STAGED: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
   MODELED: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
   'INTERNAL_R&D': 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+  BLOCKED: 'bg-red-500/20 text-red-300 border-red-500/30',
+  ARCHIVED: 'bg-ink-500/20 text-ink-400 border-ink-500/30',
 };
 
 export function DeploymentPill({ status }: { status: DeploymentBadge }) {

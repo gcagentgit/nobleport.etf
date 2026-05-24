@@ -482,6 +482,7 @@ export const getAgents = (): Agent[] => [
     lastHeartbeat: minus(0),
     killSwitchArmed: false,
     currentTask: 'Live call · Highland follow-up',
+    deploymentStatus: 'LIVE',
   },
   {
     id: 'a-gcagent',
@@ -497,6 +498,7 @@ export const getAgents = (): Agent[] => [
     lastHeartbeat: minus(0),
     killSwitchArmed: false,
     currentTask: 'NP-198 schedule recompute',
+    deploymentStatus: 'LIVE',
   },
   {
     id: 'a-permit',
@@ -512,6 +514,7 @@ export const getAgents = (): Agent[] => [
     lastHeartbeat: minus(1),
     killSwitchArmed: false,
     currentTask: 'Newbury Coastal AE redline scan',
+    deploymentStatus: 'STAGED',
   },
   {
     id: 'a-cyborg',
@@ -526,6 +529,7 @@ export const getAgents = (): Agent[] => [
     uptime30d: 1.0,
     lastHeartbeat: minus(0),
     killSwitchArmed: true,
+    deploymentStatus: 'MODELED',
   },
   {
     id: 'a-deepagent',
@@ -541,6 +545,7 @@ export const getAgents = (): Agent[] => [
     lastHeartbeat: minus(0),
     killSwitchArmed: false,
     currentTask: 'Tannery Mills MEP redline',
+    deploymentStatus: 'MODELED',
   },
   {
     id: 'a-kuzo',
@@ -556,6 +561,7 @@ export const getAgents = (): Agent[] => [
     lastHeartbeat: minus(11),
     killSwitchArmed: false,
     currentTask: undefined,
+    deploymentStatus: 'MODELED',
   },
   {
     id: 'a-collector',
@@ -571,6 +577,7 @@ export const getAgents = (): Agent[] => [
     lastHeartbeat: minus(0),
     killSwitchArmed: false,
     currentTask: 'INV-2026-0412 follow-up',
+    deploymentStatus: 'STAGED',
   },
   {
     id: 'a-bidops',
@@ -585,6 +592,7 @@ export const getAgents = (): Agent[] => [
     uptime30d: 0.94,
     lastHeartbeat: minus(34),
     killSwitchArmed: false,
+    deploymentStatus: 'MODELED',
   },
 ];
 
