@@ -17,6 +17,7 @@ const PRIMARY: NavItem[] = [
   { href: '/dashboard/agents', label: 'Agents', hint: 'AI mesh · queues' },
   { href: '/dashboard/voice', label: 'Voice', hint: 'Stephanie console' },
   { href: '/dashboard/compliance', label: 'Compliance', hint: 'Cyborg · kill switches' },
+  { href: '/dashboard/labor-disruption', label: 'Labor', hint: 'AI disruption tracker' },
   { href: '/dashboard/audit', label: 'Audit', hint: 'Hash-linked chain' },
 ];
 
