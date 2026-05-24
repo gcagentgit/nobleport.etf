@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter
 
+from backend.config.command_freeze import BLOCKED_COMMANDS
+from backend.config.operational_truth import OPERATIONAL_TRUTH, get_status_summary
 from backend.config.settings import settings
 
 router = APIRouter()
@@ -30,4 +32,35 @@ async def health_check():
                 "chain_id": settings.nobleport_chain_id,
             },
         },
+        "operational_truth": get_status_summary(),
+        "frozen_commands": len(BLOCKED_COMMANDS),
+    }
+
+
+@router.get("/health/features")
+async def feature_status():
+    """Operational truth matrix: deployment status for every feature surface."""
+    return {
+        "summary": get_status_summary(),
+        "features": {
+            k: {"status": v["status"].value, "surface": v["surface"]}
+            for k, v in OPERATIONAL_TRUTH.items()
+        },
+    }
+
+
+@router.get("/health/command-freeze")
+async def command_freeze():
+    """Lists all blocked autonomous commands and their alternatives."""
+    return {
+        "total_frozen": len(BLOCKED_COMMANDS),
+        "commands": [
+            {
+                "command": cmd.command,
+                "reason": cmd.reason.value,
+                "description": cmd.description,
+                "alternative": cmd.alternative,
+            }
+            for cmd in BLOCKED_COMMANDS
+        ],
     }
