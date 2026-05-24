@@ -84,6 +84,35 @@ class Settings(BaseSettings):
     stephanie_mcp_endpoint: str = "http://localhost:3100/mcp"
     stephanie_api_key: Optional[str] = None
 
+    # RAOS Memory Architecture
+    pgvector_enabled: bool = False
+    qdrant_url: Optional[str] = None
+    raos_memory_ttl_default: int = 86400  # 24 hours
+
+    # PermitStream
+    permitstream_enabled: bool = True
+    permitstream_default_municipalities: list[str] = Field(
+        default=["Newburyport", "Gloucester", "Rowley"]
+    )
+
+    # AuditBeacon
+    audit_beacon_enabled: bool = True
+    audit_anchor_chain: str = "arbitrum"
+    audit_anchor_enabled: bool = False  # Phase 3
+
+    # NATS Event Bus
+    nats_url: str = "nats://localhost:4222"
+    nats_enabled: bool = False
+
+    # Voice Gateway
+    voice_gateway_enabled: bool = False
+    elevenlabs_api_key: Optional[str] = None
+    livekit_url: Optional[str] = None
+
+    # Agent Mesh
+    agent_heartbeat_interval_seconds: int = 30
+    agent_unhealthy_threshold_seconds: int = 120
+
     # CORS
     cors_origins: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:8400"]

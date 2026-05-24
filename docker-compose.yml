@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+  # ── Core Database ──────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: nobleport
+      POSTGRES_USER: nobleport
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nobleport_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nobleport"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Cache / Active Memory ──────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Event Bus ──────────────────────────────────────────────────────
+  nats:
+    image: nats:2-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["--jetstream", "--store_dir=/data"]
+    volumes:
+      - natsdata:/data
+
+  # ── Backend (FastAPI) ──────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8400:8400"
+    environment:
+      NOBLEPORT_DATABASE_URL: postgresql+asyncpg://nobleport:${POSTGRES_PASSWORD:-nobleport_dev}@postgres:5432/nobleport
+      NOBLEPORT_POSTGRES_URL: postgresql+asyncpg://nobleport:${POSTGRES_PASSWORD:-nobleport_dev}@postgres:5432/nobleport
+      NOBLEPORT_REDIS_URL: redis://redis:6379/0
+      NOBLEPORT_NATS_URL: nats://nats:4222
+      NOBLEPORT_NATS_ENABLED: "true"
+      NOBLEPORT_PGVECTOR_ENABLED: "true"
+      NOBLEPORT_ENVIRONMENT: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+
+  # ── Frontend (Next.js) ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_DASHBOARD_API_BASE: http://backend:8400/api
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  redisdata:
+  natsdata:

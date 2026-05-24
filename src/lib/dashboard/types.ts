@@ -205,3 +205,86 @@ export interface DashboardOverview {
   pipeline: PipelineStage[];
   upcomingMilestones: { jobCode: string; milestone: string; at: string }[];
 }
+
+// ── Matter OS: RAOS Memory ──────────────────────────────────────────
+
+export type MemoryScope = 'global' | 'stephanie' | 'gcagent' | 'permitstream' | 'cyborg' | 'audit_beacon';
+
+export interface OperationalMemoryEntry {
+  key: string;
+  value: unknown;
+  category: string;
+  entityType?: string;
+  entityId?: string;
+  writtenBy?: string;
+  version: number;
+  updatedAt: string;
+}
+
+// ── Matter OS: PermitStream ─────────────────────────────────────────
+
+export interface PermitDetail extends Permit {
+  internalRef: string;
+  deficiencyScore: number;
+  zoningRiskScore: number;
+  completenessScore: number;
+  correctionRounds: number;
+  checklist: PermitChecklistItem[];
+}
+
+export interface PermitChecklistItem {
+  item: string;
+  required: boolean;
+  complete: boolean;
+  category: string;
+}
+
+// ── Matter OS: AWO Ledger ───────────────────────────────────────────
+
+export interface ChangeOrder {
+  id: string;
+  jobId: string;
+  changeOrderNumber: string;
+  title: string;
+  reason: string;
+  status: 'draft' | 'proposed' | 'sent' | 'approved' | 'in_progress' | 'completed' | 'rejected' | 'voided';
+  laborCost: number;
+  materialCost: number;
+  markupPercent: number;
+  totalAmount: number;
+  scheduleImpactDays: number;
+  approvedBy?: string;
+  aiSuggested: boolean;
+}
+
+// ── Matter OS: Intake ───────────────────────────────────────────────
+
+export interface IntakeLead {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  source: string;
+  status: string;
+  propertyAddress?: string;
+  city?: string;
+  estimatedValue?: number;
+  assignedTo?: string;
+  homeownerScore?: number;
+  createdAt: string;
+}
+
+// ── Matter OS: Notifications ────────────────────────────────────────
+
+export interface SystemNotification {
+  id: string;
+  channel: string;
+  priority: 'low' | 'normal' | 'high' | 'critical';
+  category: string;
+  recipient: string;
+  title: string;
+  body?: string;
+  read: boolean;
+  actionUrl?: string;
+  createdAt: string;
+}

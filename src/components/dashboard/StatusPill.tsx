@@ -29,3 +29,15 @@ export function SeverityPill({ severity }: { severity: Severity }) {
   if (severity === 'warn') return <span className="pill-warn">WARN</span>;
   return <span className="pill-info">INFO</span>;
 }
+
+const statusClass: Record<string, string> = {
+  ok: 'pill-ok',
+  warn: 'pill-warn',
+  err: 'pill-err',
+  info: 'pill-info',
+  muted: 'pill-mute',
+};
+
+export function StatusPill({ status, label }: { status: string; label: string }) {
+  return <span className={statusClass[status] ?? 'pill-mute'}>{label}</span>;
+}

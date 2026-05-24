@@ -40,6 +40,16 @@ prometheus-client==0.21.1
 # Web3 Bridge
 web3==7.6.0
 
+# RAOS Memory Architecture
+pgvector==0.3.6
+
+# Event Bus
+nats-py==2.9.0
+
+# AI Orchestration
+langgraph==0.2.60
+langchain-core==0.3.28
+
 # Environment & Config
 python-dotenv==1.0.1
 

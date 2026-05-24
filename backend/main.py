@@ -25,6 +25,11 @@ from backend.api.payments import router as payments_router
 from backend.api.change_orders import router as change_orders_router
 from backend.api.revenue import router as revenue_router
 from backend.api.dashboard import router as dashboard_router
+from backend.api.permits import router as permits_router
+from backend.api.audit import router as audit_router
+from backend.api.intake import router as intake_router
+from backend.api.agents import router as agents_router
+from backend.api.notifications import router as notifications_router
 from backend.config.database import init_db
 from backend.config.settings import settings
 from backend.services.sync_engine import SyncEngine
@@ -58,13 +63,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="NoblePort Backend",
+    title="NoblePort Matter OS",
     description=(
-        "Python/Linux backend for NoblePort Networks. "
-        "Provides construction project management APIs, Buildertrend integration bridge, "
-        "and data sync services connecting to the NoblePort ETF tokenization platform."
+        "AI-powered construction operating system. "
+        "Stephanie.ai orchestration, GCagent.ai workflows, PermitStream.ai intelligence, "
+        "Cyborg.ai compliance, AuditBeacon immutable audit infrastructure."
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -93,6 +98,11 @@ app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
 app.include_router(change_orders_router, prefix="/api/change-orders", tags=["Change Orders (AWO)"])
 app.include_router(revenue_router, prefix="/api/revenue", tags=["Revenue Engine"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["Mission Control"])
+app.include_router(permits_router, prefix="/api/permits", tags=["PermitStream"])
+app.include_router(audit_router, prefix="/api/audit", tags=["AuditBeacon"])
+app.include_router(intake_router, prefix="/api/intake", tags=["Intake"])
+app.include_router(agents_router, prefix="/api/agents", tags=["Agent Mesh"])
+app.include_router(notifications_router, prefix="/api/notifications", tags=["Notifications"])
 
 
 if __name__ == "__main__":
