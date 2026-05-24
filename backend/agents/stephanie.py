@@ -67,14 +67,24 @@ class StephanieAgent(BaseAgent):
         match task_type:
             case "route_intake":
                 return await self.route_intake(payload.get("lead_data", {}))
-            case "generate_ops_brief":
+            case "generate_ops_brief" | "ops_brief_requested":
                 return await self.generate_ops_brief()
             case "route_task":
                 return await self.route_task(payload)
             case "get_telemetry":
                 return await self.get_telemetry()
+            # Routed events — Stephanie is the default intake for pipeline events
+            case "lead_created" | "lead_updated":
+                return await self.route_intake(payload.get("lead_data", payload))
+            case "estimate_created" | "estimate_sent" | "estimate_approved" | "estimate_won":
+                return await self.route_task({
+                    "type": task_type,
+                    "subject": payload.get("subject_id", ""),
+                    **payload,
+                })
             case _:
-                raise ValueError(f"Unknown Stephanie task type: {task_type}")
+                # Stephanie is the front door — unknown tasks get routed
+                return await self.route_task({"type": task_type, **payload})
 
     # -----------------------------------------------------------------------
     # 1. Intake routing

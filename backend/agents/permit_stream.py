@@ -148,6 +148,22 @@ class PermitStreamAgent(BaseAgent):
                 return await self.get_ahj_intelligence(payload.get("municipality", "unknown"))
             case "track_inspection_schedule":
                 return await self.track_inspection_schedule(payload["job_id"])
+            # Routed events from the orchestrator
+            case "permit_submitted" | "permit_status_changed":
+                project_id = payload.get("project_id", payload.get("subject_id", ""))
+                if project_id:
+                    return await self.assess_permit_risk(project_id)
+                return {"event": task_type, "status": "acknowledged", "agent": "PermitStream"}
+            case "inspection_scheduled" | "inspection_completed":
+                job_id = payload.get("job_id", payload.get("subject_id", ""))
+                if job_id:
+                    return await self.track_inspection_schedule(job_id)
+                return {"event": task_type, "status": "acknowledged", "agent": "PermitStream"}
+            case "zoning_review_requested":
+                return await self.check_zoning_compliance(
+                    payload.get("parcel_id", ""),
+                    payload.get("project_type", "residential_renovation"),
+                )
             case _:
                 raise ValueError(f"Unknown PermitStream task type: {task_type}")
 

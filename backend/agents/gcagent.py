@@ -70,6 +70,22 @@ class GCAgent(BaseAgent):
                 return await self.analyze_cost_variance(payload["job_id"])
             case "generate_daily_field_report":
                 return await self.generate_daily_field_report(payload["job_id"])
+            # Routed events from the orchestrator
+            case "job_activated" | "job_updated" | "cost_recorded" | "crew_assigned":
+                job_id = payload.get("job_id", payload.get("subject_id", ""))
+                if job_id:
+                    return await self.assess_job_health(job_id)
+                return {"event": task_type, "status": "acknowledged", "agent": "GCagent"}
+            case "daily_log_submitted":
+                job_id = payload.get("job_id", payload.get("subject_id", ""))
+                if job_id:
+                    return await self.generate_daily_field_report(job_id)
+                return {"event": task_type, "status": "acknowledged", "agent": "GCagent"}
+            case "schedule_changed":
+                job_id = payload.get("job_id", payload.get("subject_id", ""))
+                if job_id:
+                    return await self.forecast_schedule(job_id)
+                return {"event": task_type, "status": "acknowledged", "agent": "GCagent"}
             case _:
                 raise ValueError(f"Unknown GCagent task type: {task_type}")
 
