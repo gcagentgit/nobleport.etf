@@ -1,0 +1,9 @@
+{
+  "name": "nobleport-realty",
+  "version": "1.0.0",
+  "description": "Blockchain-Powered Real Estate Investment",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo \"Static site - no build needed\""
+  }
+}
