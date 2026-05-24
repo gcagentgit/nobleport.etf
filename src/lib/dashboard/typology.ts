@@ -98,7 +98,7 @@ export const LAYER_DEFINITIONS: LayerDefinition[] = [
 
 // ─── Module Registry ──────────────────────────────────────────────────────────
 
-export type ModuleStatus = 'LIVE' | 'STAGED' | 'MODELED' | 'BLOCKED' | 'ARCHIVED';
+export type ModuleStatus = 'LIVE' | 'STAGED' | 'MODELED' | 'EXTERNAL' | 'SPECIFICATION' | 'BLOCKED' | 'ARCHIVED';
 
 export interface SystemModule {
   id: string;
@@ -366,33 +366,17 @@ export const SYSTEM_MODULES: SystemModule[] = [
     dependencies: ['redis'],
   },
 
-  // ── Audit & Truth Layer ──
+  // ���─ Audit & Truth Layer ──
+  // NOTE: "Proposed Audit Architecture" (SPECIFICATION) is separated from
+  // "Production Logging" (LIVE). Do not conflate these in any materials.
   {
-    id: 'audit-beacon',
-    name: 'AuditBeacon Events',
+    id: 'production-logging',
+    name: 'Production Logging',
     layer: 'audit',
-    status: 'MODELED',
+    status: 'LIVE',
     health: 'healthy',
-    description: 'Pre-write event logging with hash chain',
-    dependencies: [],
-  },
-  {
-    id: 'merkle-anchors',
-    name: 'Merkle Anchors',
-    layer: 'audit',
-    status: 'MODELED',
-    health: 'healthy',
-    description: 'Daily merkle root proof publication',
-    dependencies: ['arbitrum'],
-  },
-  {
-    id: 'permit-history',
-    name: 'Permit History',
-    layer: 'audit',
-    status: 'STAGED',
-    health: 'healthy',
-    description: 'Immutable permit application and decision log',
-    dependencies: ['postgres'],
+    description: 'Structured application logs (stdout, Sentry, file)',
+    dependencies: ['python-logging', 'sentry'],
   },
   {
     id: 'awo-history',
@@ -400,44 +384,98 @@ export const SYSTEM_MODULES: SystemModule[] = [
     layer: 'audit',
     status: 'LIVE',
     health: 'healthy',
-    description: 'Change order evidence chain',
+    description: 'Change order evidence chain in PostgreSQL',
     dependencies: ['postgres'],
+  },
+  {
+    id: 'permit-history',
+    name: 'Permit History',
+    layer: 'audit',
+    status: 'STAGED',
+    health: 'healthy',
+    description: 'Permit application and decision log',
+    dependencies: ['postgres'],
+  },
+  {
+    id: 'audit-beacon',
+    name: 'AuditBeacon (Proposed)',
+    layer: 'audit',
+    status: 'SPECIFICATION',
+    health: 'unknown',
+    description: 'PROPOSED: Pre-write event logging with merkle anchoring',
+    dependencies: [],
+  },
+  {
+    id: 'merkle-anchors',
+    name: 'Merkle Anchors (Proposed)',
+    layer: 'audit',
+    status: 'SPECIFICATION',
+    health: 'unknown',
+    description: 'PROPOSED: Daily merkle root proof publication to L2',
+    dependencies: ['arbitrum'],
   },
 
   // ── Client Experience Layer ──
   {
     id: 'voice-intake',
-    name: 'Voice Intake',
+    name: 'Voice Intake (Inbound)',
     layer: 'client_experience',
-    status: 'LIVE',
+    status: 'STAGED',
     health: 'healthy',
     description: 'Homeowner voice consultation via Stephanie.ai',
     dependencies: ['livekit', 'elevenlabs'],
   },
   {
-    id: 'avatar-render',
-    name: 'Avatar Rendering',
+    id: 'voice-outbound',
+    name: 'Voice Intake (Outbound)',
     layer: 'client_experience',
-    status: 'MODELED',
+    status: 'STAGED',
     health: 'healthy',
-    description: 'Visual avatar for video consultations',
-    dependencies: ['webrtc'],
+    description: 'Proactive outbound calls for follow-ups',
+    dependencies: ['livekit', 'elevenlabs', '3cx'],
+  },
+  {
+    id: 'streaming-ui',
+    name: 'Streaming Transcript UI',
+    layer: 'client_experience',
+    status: 'STAGED',
+    health: 'healthy',
+    description: 'Real-time voice transcript in dashboard console',
+    dependencies: ['livekit', 'nextjs'],
+  },
+  {
+    id: 'avatar-render',
+    name: 'Real-Time Avatar',
+    layer: 'client_experience',
+    status: 'SPECIFICATION',
+    health: 'unknown',
+    description: 'SPEC: Visual avatar for video (latency requirements not met)',
+    dependencies: ['webrtc', 'gpu'],
   },
   {
     id: 'homeowner-portal',
     name: 'Homeowner Portal',
     layer: 'client_experience',
-    status: 'MODELED',
-    health: 'healthy',
-    description: 'Client-facing project status and communication',
+    status: 'SPECIFICATION',
+    health: 'unknown',
+    description: 'SPEC: Client-facing project status dashboard',
     dependencies: ['nextjs'],
+  },
+  {
+    id: 'multilingual-voice',
+    name: 'Multilingual Voice',
+    layer: 'client_experience',
+    status: 'MODELED',
+    health: 'unknown',
+    description: 'Multi-language intake (Spanish, Portuguese)',
+    dependencies: ['elevenlabs-multilingual'],
   },
   {
     id: 'sentiment-analytics',
     name: 'Customer Sentiment',
     layer: 'client_experience',
     status: 'MODELED',
-    health: 'healthy',
+    health: 'unknown',
     description: 'Emotion scoring and satisfaction tracking',
     dependencies: [],
   },
@@ -527,7 +565,9 @@ export function getLayerHealth(layer: OperationalLayer): Health {
 }
 
 export function getStatusCounts(): Record<ModuleStatus, number> {
-  const counts: Record<ModuleStatus, number> = { LIVE: 0, STAGED: 0, MODELED: 0, BLOCKED: 0, ARCHIVED: 0 };
+  const counts: Record<ModuleStatus, number> = {
+    LIVE: 0, STAGED: 0, MODELED: 0, EXTERNAL: 0, SPECIFICATION: 0, BLOCKED: 0, ARCHIVED: 0,
+  };
   for (const m of SYSTEM_MODULES) {
     counts[m.status]++;
   }

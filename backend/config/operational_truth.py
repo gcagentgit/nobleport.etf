@@ -1,11 +1,22 @@
 """
-Operational Truth Matrix
+Operational Truth Matrix — Centralized Classification
 
-Enforces LIVE / STAGED / MODELED / INTERNAL_R&D classification for every
-feature surface. Prevents simulated infrastructure from being interpreted
-as live production capability. This matrix is the single source of truth
-for dashboards, investor decks, API docs, sales demos, internal telemetry,
-and website badges.
+Every feature surface in the NoblePort stack MUST carry one of these
+classifications. This is the single source of truth for dashboards,
+investor decks, API docs, sales demos, internal telemetry, and legal
+review.
+
+Classifications:
+  LIVE           — production-verified, serving real users/data
+  STAGED         — implemented, not yet in production use
+  MODELED        — architectural concept with deterministic fixtures
+  EXTERNAL       — third-party dependency (not our code)
+  SPECIFICATION  — design document only, no implementation
+  INTERNAL_R&D   — research prototype, not customer-facing
+
+Any document labeled "CANONICAL" must exclusively contain LIVE features.
+Documents containing mixed-status features must display this classification
+visibly next to every non-LIVE element.
 """
 
 from __future__ import annotations
@@ -18,6 +29,8 @@ class DeploymentStatus(str, Enum):
     LIVE = "LIVE"
     STAGED = "STAGED"
     MODELED = "MODELED"
+    EXTERNAL = "EXTERNAL"
+    SPECIFICATION = "SPECIFICATION"
     INTERNAL_RD = "INTERNAL_R&D"
 
 
@@ -53,6 +66,12 @@ OPERATIONAL_TRUTH: dict[str, dict[str, Any]] = {
         "description": "Mission Control KPI tiles and pipeline funnel",
         "dependencies": ["nextjs", "tailwind"],
     },
+    "production_logging": {
+        "status": DeploymentStatus.LIVE,
+        "surface": "Backend",
+        "description": "Structured application logging (stdout/file)",
+        "dependencies": ["python-logging"],
+    },
 
     # ── STAGED ────────────────────────────────────────────────────────
     "permit_scraping": {
@@ -86,6 +105,12 @@ OPERATIONAL_TRUTH: dict[str, dict[str, Any]] = {
         "description": "Stalled deal detection, deposit reminders, margin alerts",
         "dependencies": ["fastapi", "postgres"],
     },
+    "voice_streaming_ui": {
+        "status": DeploymentStatus.STAGED,
+        "surface": "Frontend",
+        "description": "Real-time voice console with transcript streaming",
+        "dependencies": ["livekit", "nextjs"],
+    },
 
     # ── MODELED ───────────────────────────────────────────────────────
     "permit_forecast": {
@@ -112,6 +137,66 @@ OPERATIONAL_TRUTH: dict[str, dict[str, Any]] = {
         "description": "GP floor enforcement and cost variance prediction",
         "dependencies": [],
     },
+    "multilingual_voice": {
+        "status": DeploymentStatus.MODELED,
+        "surface": "Stephanie.ai",
+        "description": "Multi-language voice intake (Spanish, Portuguese)",
+        "dependencies": ["elevenlabs"],
+    },
+
+    # ── EXTERNAL ──────────────────────────────────────────────────────
+    "vercel_edge": {
+        "status": DeploymentStatus.EXTERNAL,
+        "surface": "Infrastructure",
+        "description": "Vercel edge runtime and preview deployments",
+        "dependencies": ["vercel"],
+    },
+    "stripe_payments": {
+        "status": DeploymentStatus.EXTERNAL,
+        "surface": "Treasury",
+        "description": "Stripe payment processing and invoicing",
+        "dependencies": ["stripe"],
+    },
+    "livekit_voice": {
+        "status": DeploymentStatus.EXTERNAL,
+        "surface": "Voice",
+        "description": "LiveKit WebRTC infrastructure for voice calls",
+        "dependencies": ["livekit"],
+    },
+    "elevenlabs_tts": {
+        "status": DeploymentStatus.EXTERNAL,
+        "surface": "Voice",
+        "description": "ElevenLabs text-to-speech voice synthesis",
+        "dependencies": ["elevenlabs"],
+    },
+    "hubspot_crm": {
+        "status": DeploymentStatus.EXTERNAL,
+        "surface": "Revenue",
+        "description": "HubSpot CRM platform",
+        "dependencies": ["hubspot"],
+    },
+
+    # ── SPECIFICATION ─────────────────────────────────────────────────
+    "audit_beacon": {
+        "status": DeploymentStatus.SPECIFICATION,
+        "surface": "Audit",
+        "description": "Pre-write event logging with merkle anchoring",
+        "dependencies": [],
+        "note": "Proposed audit architecture — not production logging",
+    },
+    "real_time_avatar": {
+        "status": DeploymentStatus.SPECIFICATION,
+        "surface": "Client Experience",
+        "description": "Real-time rendered avatar for video consultations",
+        "dependencies": ["webrtc", "gpu"],
+        "note": "R&D design spec — latency requirements not yet met",
+    },
+    "homeowner_portal": {
+        "status": DeploymentStatus.SPECIFICATION,
+        "surface": "Client Experience",
+        "description": "Client-facing project status dashboard",
+        "dependencies": ["nextjs"],
+    },
 
     # ── INTERNAL R&D ──────────────────────────────────────────────────
     "dao_governance": {
@@ -120,11 +205,17 @@ OPERATIONAL_TRUTH: dict[str, dict[str, Any]] = {
         "description": "Multi-sig approval flows and proposal lifecycle",
         "dependencies": ["ethers"],
     },
-    "erc1400_tokenization": {
+    "security_tokens": {
         "status": DeploymentStatus.INTERNAL_RD,
         "surface": "Contracts",
-        "description": "Security token issuance for real estate assets",
-        "dependencies": ["solidity"],
+        "description": "Security token structural design (Solana Token-2022)",
+        "dependencies": ["solidity", "solana"],
+        "legal_notice": (
+            "STRUCTURAL DESIGN ONLY — NOT PUBLICLY OFFERED. "
+            "No active securities offering, no broker-dealer activity. "
+            "Requires: counsel sign-off, issuance structure finalized, "
+            "transfer agent designated, exemption confirmed."
+        ),
     },
     "ssi_identity": {
         "status": DeploymentStatus.INTERNAL_RD,
@@ -161,3 +252,12 @@ def get_status_summary() -> dict[str, int]:
         key = entry["status"].value
         counts[key] = counts.get(key, 0) + 1
     return counts
+
+
+def get_legal_notices() -> list[dict[str, str]]:
+    """Features with legal/regulatory notices that must be surfaced."""
+    return [
+        {"feature": k, "notice": v["legal_notice"]}
+        for k, v in OPERATIONAL_TRUTH.items()
+        if "legal_notice" in v
+    ]

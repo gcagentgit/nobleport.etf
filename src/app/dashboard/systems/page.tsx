@@ -21,10 +21,12 @@ export default function SystemsPage() {
     <>
       <Topbar pageTitle="System Typology" generatedAt={now} />
       <main className="flex-1 space-y-6 px-4 py-4 sm:px-6 sm:py-6">
-        <section aria-label="Status summary" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <section aria-label="Status summary" className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           <StatusCount label="LIVE" count={counts.LIVE} color="text-emerald-300" />
           <StatusCount label="STAGED" count={counts.STAGED} color="text-blue-300" />
           <StatusCount label="MODELED" count={counts.MODELED} color="text-amber-300" />
+          <StatusCount label="EXTERNAL" count={counts.EXTERNAL} color="text-cyan-300" />
+          <StatusCount label="SPEC" count={counts.SPECIFICATION} color="text-violet-300" />
           <StatusCount label="BLOCKED" count={counts.BLOCKED} color="text-red-300" />
           <StatusCount label="ARCHIVED" count={counts.ARCHIVED} color="text-ink-400" />
         </section>

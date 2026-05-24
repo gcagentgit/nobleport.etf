@@ -105,15 +105,20 @@ MODULES: list[dict[str, Any]] = [
     {"id": "voice-pipeline", "name": "Voice Pipeline", "layer": "infrastructure", "status": "LIVE"},
     {"id": "database", "name": "PostgreSQL", "layer": "infrastructure", "status": "LIVE"},
     {"id": "task-queue", "name": "Redis Task Queue", "layer": "infrastructure", "status": "STAGED"},
-    # Audit
-    {"id": "audit-beacon", "name": "AuditBeacon Events", "layer": "audit", "status": "MODELED"},
-    {"id": "merkle-anchors", "name": "Merkle Anchors", "layer": "audit", "status": "MODELED"},
-    {"id": "permit-history", "name": "Permit History", "layer": "audit", "status": "STAGED"},
+    # Audit — IMPORTANT: "Proposed Audit Architecture" is SPECIFICATION,
+    # separated from "Production Logging" which is LIVE.
+    {"id": "production-logging", "name": "Production Logging", "layer": "audit", "status": "LIVE"},
     {"id": "awo-history", "name": "AWO History", "layer": "audit", "status": "LIVE"},
-    # Client Experience
-    {"id": "voice-intake", "name": "Voice Intake", "layer": "client_experience", "status": "LIVE"},
-    {"id": "avatar-render", "name": "Avatar Rendering", "layer": "client_experience", "status": "MODELED"},
-    {"id": "homeowner-portal", "name": "Homeowner Portal", "layer": "client_experience", "status": "MODELED"},
+    {"id": "permit-history", "name": "Permit History", "layer": "audit", "status": "STAGED"},
+    {"id": "audit-beacon", "name": "AuditBeacon (Proposed)", "layer": "audit", "status": "SPECIFICATION"},
+    {"id": "merkle-anchors", "name": "Merkle Anchors (Proposed)", "layer": "audit", "status": "SPECIFICATION"},
+    # Client Experience — voice maturity labels visible per capability
+    {"id": "voice-inbound", "name": "Voice Intake (Inbound)", "layer": "client_experience", "status": "STAGED"},
+    {"id": "voice-outbound", "name": "Voice Intake (Outbound)", "layer": "client_experience", "status": "STAGED"},
+    {"id": "streaming-ui", "name": "Streaming Transcript UI", "layer": "client_experience", "status": "STAGED"},
+    {"id": "avatar-render", "name": "Real-Time Avatar", "layer": "client_experience", "status": "SPECIFICATION"},
+    {"id": "homeowner-portal", "name": "Homeowner Portal", "layer": "client_experience", "status": "SPECIFICATION"},
+    {"id": "multilingual-voice", "name": "Multilingual Voice", "layer": "client_experience", "status": "MODELED"},
     {"id": "sentiment-analytics", "name": "Customer Sentiment", "layer": "client_experience", "status": "MODELED"},
 ]
 
@@ -144,7 +149,10 @@ async def get_modules(
 @router.get("/summary")
 async def get_typology_summary() -> dict[str, Any]:
     """Status counts across all modules."""
-    counts: dict[str, int] = {"LIVE": 0, "STAGED": 0, "MODELED": 0, "BLOCKED": 0, "ARCHIVED": 0}
+    counts: dict[str, int] = {
+        "LIVE": 0, "STAGED": 0, "MODELED": 0, "EXTERNAL": 0,
+        "SPECIFICATION": 0, "BLOCKED": 0, "ARCHIVED": 0,
+    }
     for m in MODULES:
         s = m["status"]
         counts[s] = counts.get(s, 0) + 1
@@ -153,4 +161,8 @@ async def get_typology_summary() -> dict[str, Any]:
         "total_layers": len(LAYERS),
         "status_counts": counts,
         "live_percentage": round(counts["LIVE"] / len(MODULES) * 100, 1),
+        "note": (
+            "Only LIVE features may be labeled 'canonical'. "
+            "All other statuses must display their classification badge visibly."
+        ),
     }
