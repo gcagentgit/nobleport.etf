@@ -47,6 +47,7 @@ export const getKpis = (): KpiTile[] => [
     trend: 'up',
     health: 'healthy',
     href: '/dashboard/revenue',
+    deploymentStatus: 'LIVE',
   },
   {
     id: 'deposits',
@@ -59,6 +60,7 @@ export const getKpis = (): KpiTile[] => [
     trend: 'up',
     health: 'healthy',
     href: '/dashboard/revenue',
+    deploymentStatus: 'STAGED',
   },
   {
     id: 'jobs',
@@ -71,6 +73,7 @@ export const getKpis = (): KpiTile[] => [
     trend: 'up',
     health: 'healthy',
     href: '/dashboard/jobs',
+    deploymentStatus: 'LIVE',
   },
   {
     id: 'permits',
@@ -84,6 +87,7 @@ export const getKpis = (): KpiTile[] => [
     health: 'degraded',
     hint: '4 stalled in corrections > 14d',
     href: '/dashboard/permits',
+    deploymentStatus: 'STAGED',
   },
   {
     id: 'gp',
@@ -97,6 +101,7 @@ export const getKpis = (): KpiTile[] => [
     health: 'degraded',
     hint: '2 jobs under GP floor',
     href: '/dashboard/jobs',
+    deploymentStatus: 'MODELED',
   },
   {
     id: 'agents',
@@ -110,6 +115,7 @@ export const getKpis = (): KpiTile[] => [
     health: 'degraded',
     hint: '2 degraded · 2 unhealthy',
     href: '/dashboard/agents',
+    deploymentStatus: 'MODELED',
   },
   {
     id: 'voice',
@@ -122,6 +128,7 @@ export const getKpis = (): KpiTile[] => [
     trend: 'up',
     health: 'healthy',
     href: '/dashboard/voice',
+    deploymentStatus: 'LIVE',
   },
   {
     id: 'compliance',
@@ -135,6 +142,7 @@ export const getKpis = (): KpiTile[] => [
     health: 'degraded',
     hint: '1 critical · 2 warnings',
     href: '/dashboard/compliance',
+    deploymentStatus: 'MODELED',
   },
 ];
 

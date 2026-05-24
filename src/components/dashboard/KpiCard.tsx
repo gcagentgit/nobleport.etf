@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { KpiTile } from '@/lib/dashboard/types';
-import { HealthPill } from './StatusPill';
+import { DeploymentPill, HealthPill } from './StatusPill';
 
 function TrendArrow({ trend }: { trend?: 'up' | 'down' | 'flat' }) {
   if (trend === 'up') return <span aria-hidden>↑</span>;
@@ -46,7 +46,10 @@ export function KpiCard({ kpi }: { kpi: KpiTile }) {
       </div>
       <div className="mt-2 flex items-center justify-between text-[11px] text-ink-400">
         <span className="uppercase tracking-wider">{kpi.source}</span>
-        {kpi.deltaLabel && <span>{kpi.deltaLabel}</span>}
+        <span className="flex items-center gap-2">
+          {kpi.deploymentStatus && <DeploymentPill status={kpi.deploymentStatus} />}
+          {kpi.deltaLabel && <span>{kpi.deltaLabel}</span>}
+        </span>
       </div>
       {kpi.hint && <p className="mt-2 text-[11px] text-yellow-300/80">{kpi.hint}</p>}
     </div>

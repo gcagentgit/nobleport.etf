@@ -1,9 +1,15 @@
 """
-NoblePort Backend - Main Application Entry Point
+NoblePort Backend — Main Application Entry Point
 
 FastAPI application serving as the Python/Linux backend for NoblePort Networks.
-Provides REST APIs for construction project management, Buildertrend integration,
-and bridge services to the NoblePort ETF tokenization platform.
+
+Architecture:
+  Stephanie.ai  → intake / orchestration interface
+  GCagent.ai    → construction execution agent
+  PermitStream.ai → permit intelligence (MA-focused)
+  This backend  → API gateway, data layer, integration bridge
+
+Revenue spine: Lead → Intake → Estimate → Permit → Build → Invoice → Closeout
 """
 
 from contextlib import asynccontextmanager

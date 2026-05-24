@@ -4,11 +4,18 @@
  * These types describe the operator-grade execution console feed.
  * Every panel reads against these contracts; the backend (FastAPI gateway,
  * LangGraph supervisor) and the mock fixtures both implement the same shapes.
+ *
+ * Deployment status badges:
+ *   LIVE         — running in production, serving real users
+ *   STAGED       — code complete, awaiting integration or launch
+ *   MODELED      — deterministic fixtures powering the UI
+ *   INTERNAL_R&D — research prototypes, not customer-facing
  */
 
 export type Health = 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
 export type Severity = 'info' | 'warn' | 'critical';
 export type Trend = 'up' | 'down' | 'flat';
+export type DeploymentBadge = 'LIVE' | 'STAGED' | 'MODELED' | 'INTERNAL_R&D';
 
 export interface KpiTile {
   id: string;
@@ -23,6 +30,7 @@ export interface KpiTile {
   href?: string;
   health?: Health;
   hint?: string;
+  deploymentStatus?: DeploymentBadge;
 }
 
 export interface PipelineStage {
