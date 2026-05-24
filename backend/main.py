@@ -1,15 +1,21 @@
 """
-NoblePort Backend — Main Application Entry Point
+NoblePort Backend — Matter OS v2.0 (Layer 4: Backend Logic)
 
-FastAPI application serving as the Python/Linux backend for NoblePort Networks.
+FastAPI application serving as the backend service layer for the
+Stephanie.ai Production Stack.
 
-Architecture:
-  Stephanie.ai  → intake / orchestration interface
-  GCagent.ai    → construction execution agent
-  PermitStream.ai → permit intelligence (MA-focused)
-  This backend  → API gateway, data layer, integration bridge
+Architecture Layers:
+  Layer 1: Stephanie.ai     → Constitutional AI Executive
+  Layer 2: Agent Layer      → GCagent.ai, PermitStream.ai, TreasuryBotV3
+  Layer 3: Vercel           → Frontend Delivery (Next.js 15 + Edge)
+  Layer 4: This Backend     → FastAPI + LangGraph + PostgreSQL
+  Layer 5: Trust Infra      → AuditBeacon + IPFS + Arweave + Safe
+  Layer 6: Blockchain       → Solana Token-2022 + zkSBT
 
 Revenue spine: Lead → Intake → Estimate → Permit → Build → Invoice → Closeout
+
+Design principle: Backend-authoritative for all regulated calculations.
+Sovereignty mandate: US-based nodes only.
 """
 
 from contextlib import asynccontextmanager
@@ -64,13 +70,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="NoblePort Backend",
+    title="NoblePort Matter OS — Backend Service Layer",
     description=(
-        "Python/Linux backend for NoblePort Networks. "
-        "Provides construction project management APIs, Buildertrend integration bridge, "
-        "and data sync services connecting to the NoblePort ETF tokenization platform."
+        "Layer 4 of the Stephanie.ai Production Stack. "
+        "Provides construction project management APIs, multi-agent orchestration, "
+        "revenue spine enforcement, and integration bridge for the NoblePort ecosystem."
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
