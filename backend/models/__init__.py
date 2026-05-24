@@ -16,3 +16,7 @@ from backend.models.schedule import ScheduleItem  # noqa: F401
 from backend.models.selection import Selection  # noqa: F401
 from backend.models.daily_log import DailyLog  # noqa: F401
 from backend.models.media import MediaFile, MediaFolder, PhotoAnnotation  # noqa: F401
+from backend.models.trust_record import TrustRecord  # noqa: F401
+from backend.models.permit import Permit  # noqa: F401
+from backend.models.inspection import Inspection  # noqa: F401
+from backend.models.maintenance import MaintenanceContract  # noqa: F401
