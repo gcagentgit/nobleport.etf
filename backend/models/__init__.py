@@ -23,3 +23,48 @@ from backend.models.mcp import (  # noqa: F401
     MCPCallLog,
     KPISnapshot,
 )
+from backend.models.operations import (  # noqa: F401
+    CustomerProfile,
+    ApprovalEvent,
+    AuditLogEntry,
+    Notification,
+    ScopeItem,
+    VendorComm,
+    PurchaseOrder,
+    PunchItem,
+    CloseoutDoc,
+)
+from backend.models.permit_ops import (  # noqa: F401
+    PermitPacket,
+    AHJRuleset,
+    DeficiencyLog,
+    DocChecklist,
+    ZoningReview,
+    ConservationFlag,
+    StampRequirement,
+    Inspection,
+    PermitRejection,
+    CertificateOfOccupancy,
+)
+from backend.models.security_ops import (  # noqa: F401
+    PolicyEvent,
+    AuthEvent,
+    AISecurityLog,
+    TreasuryEvent,
+    VendorCompliance,
+    ComplianceDoc,
+    AuditChainAnchor,
+    Incident,
+    RiskScore,
+)
+from backend.models.infra_ops import (  # noqa: F401
+    AutomationRun,
+    WorkerHealth,
+    QueueMetric,
+    BackupLog,
+    Deployment,
+    ErrorLog,
+    APIHealthCheck,
+    DBMetric,
+    FileEvent,
+)

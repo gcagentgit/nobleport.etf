@@ -22,13 +22,30 @@ from backend.config.module_registry import MODULE_DEFINITIONS, ModuleDef
 from backend.models.change_order import ChangeOrder
 from backend.models.daily_log import DailyLog
 from backend.models.estimate import Estimate
+from backend.models.infra_ops import (
+    APIHealthCheck, AutomationRun, BackupLog, DBMetric,
+    Deployment, ErrorLog, FileEvent, QueueMetric, WorkerHealth,
+)
 from backend.models.invoice import Invoice
 from backend.models.job import Job
 from backend.models.lead import Lead
 from backend.models.mcp import MCPCallLog, NoblePortModuleRegistry, KPISnapshot as KPISnapshotModel
+from backend.models.operations import (
+    ApprovalEvent, AuditLogEntry, CloseoutDoc, CustomerProfile,
+    Notification, PunchItem, PurchaseOrder, ScopeItem, VendorComm,
+)
 from backend.models.payment import Payment
+from backend.models.permit_ops import (
+    AHJRuleset, CertificateOfOccupancy, ConservationFlag, DeficiencyLog,
+    DocChecklist, Inspection, PermitPacket, PermitRejection,
+    StampRequirement, ZoningReview,
+)
 from backend.models.project import Project
 from backend.models.schedule import ScheduleItem
+from backend.models.security_ops import (
+    AISecurityLog, AuditChainAnchor, AuthEvent, ComplianceDoc,
+    Incident, PolicyEvent, RiskScore, TreasuryEvent, VendorCompliance,
+)
 
 
 @dataclass
@@ -42,37 +59,116 @@ class KPIReading:
     measured_at: str
 
 
-TABLE_QUERY_MAP: dict[int, dict[str, Any]] = {
-    # Module 1: Executive Command Center — count of MCP calls today
-    1: {"table": "mcp_call_log", "query": "count"},
-    # Module 2: Lead Intake — total leads
-    2: {"table": "leads", "query": "count"},
-    # Module 4: Project Registry — active projects
-    4: {"table": "projects", "query": "count"},
-    # Module 5: Workflow Router — routing success rate from mcp_call_log
-    5: {"table": "mcp_call_log", "query": "success_rate"},
-    # Module 8: Truth Ledger — LIVE/MODELED/BLOCKED ratio
-    8: {"table": "nobleport_module_registry", "query": "truth_ratio"},
-    # Module 10: KPI Dashboard — modules with live data
-    10: {"table": "kpi_snapshot", "query": "live_count"},
-    # Module 11: Estimate Engine — estimates count
-    11: {"table": "estimates", "query": "count"},
-    # Module 13: AWO Engine — change orders count
-    13: {"table": "change_orders", "query": "count"},
-    # Module 14: Job Costing — avg margin percent across jobs
-    14: {"table": "jobs", "query": "avg_margin"},
-    # Module 15: Schedule Builder — avg slippage (schedule items with delays)
-    15: {"table": "schedule_items", "query": "count"},
-    # Module 18: Field Daily Logs — daily log count
-    18: {"table": "daily_logs", "query": "count"},
-    # Module 34: Tool Permission Guard — denied calls from mcp_call_log
-    34: {"table": "mcp_call_log", "query": "denied_count"},
+MODEL_MAP: dict[str, type] = {
+    "leads": Lead,
+    "projects": Project,
+    "estimates": Estimate,
+    "jobs": Job,
+    "invoices": Invoice,
+    "payments": Payment,
+    "change_orders": ChangeOrder,
+    "schedule_items": ScheduleItem,
+    "daily_logs": DailyLog,
+    "mcp_call_log": MCPCallLog,
+    "nobleport_module_registry": NoblePortModuleRegistry,
+    "kpi_snapshot": KPISnapshotModel,
+    "customer_profiles": CustomerProfile,
+    "approval_events": ApprovalEvent,
+    "audit_log": AuditLogEntry,
+    "notifications": Notification,
+    "scope_items": ScopeItem,
+    "vendor_comms": VendorComm,
+    "purchase_orders": PurchaseOrder,
+    "punch_list": PunchItem,
+    "closeout_docs": CloseoutDoc,
+    "permit_intake": PermitPacket,
+    "ahj_rulesets": AHJRuleset,
+    "deficiency_log": DeficiencyLog,
+    "doc_checklist": DocChecklist,
+    "zoning_review": ZoningReview,
+    "conservation_flags": ConservationFlag,
+    "stamp_requirements": StampRequirement,
+    "inspections": Inspection,
+    "permit_rejections": PermitRejection,
+    "certificates_of_occupancy": CertificateOfOccupancy,
+    "policy_events": PolicyEvent,
+    "auth_events": AuthEvent,
+    "ai_security_logs": AISecurityLog,
+    "treasury_events": TreasuryEvent,
+    "vendor_compliance": VendorCompliance,
+    "compliance_docs": ComplianceDoc,
+    "audit_chain_anchors": AuditChainAnchor,
+    "incidents": Incident,
+    "risk_scores": RiskScore,
+    "automation_runs": AutomationRun,
+    "worker_health": WorkerHealth,
+    "queue_metrics": QueueMetric,
+    "backup_logs": BackupLog,
+    "deployments": Deployment,
+    "error_logs": ErrorLog,
+    "api_health_checks": APIHealthCheck,
+    "db_metrics": DBMetric,
+    "file_events": FileEvent,
 }
 
 
-async def _count_table(session: AsyncSession, model: type) -> float:
-    result = await session.execute(select(func.count()).select_from(model))
-    return float(result.scalar() or 0)
+TABLE_QUERY_MAP: dict[int, dict[str, Any]] = {
+    # Executive Layer
+    1:  {"model": MCPCallLog, "query": "count"},
+    2:  {"model": Lead, "query": "count"},
+    3:  {"model": CustomerProfile, "query": "count_where", "field": "profile_complete", "value": True},
+    4:  {"model": Project, "query": "count"},
+    5:  {"model": MCPCallLog, "query": "success_rate"},
+    6:  {"model": ApprovalEvent, "query": "count_where", "field": "status", "value": "pending"},
+    7:  {"model": AuditLogEntry, "query": "percent_true", "field": "chain_anchored"},
+    8:  {"model": NoblePortModuleRegistry, "query": "count_where", "field": "truth_label", "value": "LIVE"},
+    9:  {"model": Notification, "query": "count_where", "field": "status", "value": "acknowledged"},
+    10: {"model": KPISnapshotModel, "query": "distinct_live"},
+    # Construction Layer
+    11: {"model": Estimate, "query": "count"},
+    12: {"model": ScopeItem, "query": "count"},
+    13: {"model": ChangeOrder, "query": "count"},
+    14: {"model": Job, "query": "avg", "field": "margin_percent"},
+    15: {"model": ScheduleItem, "query": "count"},
+    16: {"model": VendorComm, "query": "avg", "field": "response_hours"},
+    17: {"model": PurchaseOrder, "query": "percent_true", "field": "on_time"},
+    18: {"model": DailyLog, "query": "count"},
+    19: {"model": PunchItem, "query": "count_where", "field": "status", "value": "open"},
+    20: {"model": CloseoutDoc, "query": "percent_true", "field": "completed"},
+    # Permitting Layer
+    21: {"model": PermitPacket, "query": "count"},
+    22: {"model": AHJRuleset, "query": "count"},
+    23: {"model": DeficiencyLog, "query": "count"},
+    24: {"model": DocChecklist, "query": "count_where", "field": "received", "value": False},
+    25: {"model": ZoningReview, "query": "count"},
+    26: {"model": ConservationFlag, "query": "count"},
+    27: {"model": StampRequirement, "query": "count"},
+    28: {"model": Inspection, "query": "count"},
+    29: {"model": PermitRejection, "query": "count"},
+    30: {"model": CertificateOfOccupancy, "query": "count"},
+    # Security Layer
+    31: {"model": PolicyEvent, "query": "count"},
+    32: {"model": AuthEvent, "query": "count_where", "field": "blocked", "value": True},
+    33: {"model": AISecurityLog, "query": "count_where", "field": "blocked", "value": True},
+    34: {"model": MCPCallLog, "query": "count_where", "field": "status", "value": "denied"},
+    35: {"model": TreasuryEvent, "query": "count_where", "field": "authorized", "value": False},
+    36: {"model": VendorCompliance, "query": "count_where", "field": "status", "value": "missing"},
+    37: {"model": ComplianceDoc, "query": "count_where", "field": "expired", "value": True},
+    38: {"model": AuditChainAnchor, "query": "count"},
+    39: {"model": Incident, "query": "count_where", "field": "status", "value": "open"},
+    40: {"model": RiskScore, "query": "avg", "field": "score"},
+    # Infrastructure Layer
+    41: {"model": AutomationRun, "query": "count_where", "field": "status", "value": "success"},
+    42: {"model": WorkerHealth, "query": "count"},
+    43: {"model": QueueMetric, "query": "sum", "field": "failed"},
+    44: {"model": BackupLog, "query": "count"},
+    45: {"model": Deployment, "query": "count_where", "field": "status", "value": "success"},
+    46: {"model": ErrorLog, "query": "count_where", "field": "resolved", "value": False},
+    47: {"model": APIHealthCheck, "query": "count"},
+    48: {"model": DBMetric, "query": "count"},
+    49: {"model": FileEvent, "query": "count"},
+    50: {"model": Lead, "query": "revenue_spine"},
+}
 
 
 async def _query_module(session: AsyncSession, module_id: int) -> tuple[float | None, str | None]:
@@ -81,84 +177,72 @@ async def _query_module(session: AsyncSession, module_id: int) -> tuple[float | 
     if not spec:
         return None, None
 
-    table = spec["table"]
+    model = spec["model"]
     query_type = spec["query"]
+    table_name = model.__tablename__
 
     try:
-        if table == "leads" and query_type == "count":
-            val = await _count_table(session, Lead)
-            return val, "postgres.leads"
+        if query_type == "count":
+            result = await session.execute(select(func.count()).select_from(model))
+            return float(result.scalar() or 0), f"postgres.{table_name}"
 
-        if table == "projects" and query_type == "count":
-            val = await _count_table(session, Project)
-            return val, "postgres.projects"
-
-        if table == "estimates" and query_type == "count":
-            val = await _count_table(session, Estimate)
-            return val, "postgres.estimates"
-
-        if table == "change_orders" and query_type == "count":
-            val = await _count_table(session, ChangeOrder)
-            return val, "postgres.change_orders"
-
-        if table == "schedule_items" and query_type == "count":
-            val = await _count_table(session, ScheduleItem)
-            return val, "postgres.schedule_items"
-
-        if table == "daily_logs" and query_type == "count":
-            val = await _count_table(session, DailyLog)
-            return val, "postgres.daily_logs"
-
-        if table == "jobs" and query_type == "avg_margin":
+        if query_type == "count_where":
+            col = getattr(model, spec["field"])
             result = await session.execute(
-                select(func.avg(Job.margin_percent)).select_from(Job)
+                select(func.count()).select_from(model).where(col == spec["value"])
             )
-            avg = result.scalar()
-            return float(avg) if avg is not None else 0.0, "postgres.jobs"
+            return float(result.scalar() or 0), f"postgres.{table_name}"
 
-        if table == "mcp_call_log" and query_type == "count":
-            val = await _count_table(session, MCPCallLog)
-            return val, "postgres.mcp_call_log"
+        if query_type == "avg":
+            col = getattr(model, spec["field"])
+            result = await session.execute(select(func.avg(col)).select_from(model))
+            val = result.scalar()
+            return round(float(val), 2) if val is not None else 0.0, f"postgres.{table_name}"
 
-        if table == "mcp_call_log" and query_type == "success_rate":
-            total_r = await session.execute(
-                select(func.count()).select_from(MCPCallLog)
-            )
+        if query_type == "sum":
+            col = getattr(model, spec["field"])
+            result = await session.execute(select(func.sum(col)).select_from(model))
+            val = result.scalar()
+            return float(val) if val is not None else 0.0, f"postgres.{table_name}"
+
+        if query_type == "percent_true":
+            col = getattr(model, spec["field"])
+            total_r = await session.execute(select(func.count()).select_from(model))
             total = total_r.scalar() or 0
             if total == 0:
-                return 100.0, "postgres.mcp_call_log"
+                return 0.0, f"postgres.{table_name}"
+            true_r = await session.execute(
+                select(func.count()).select_from(model).where(col == True)  # noqa: E712
+            )
+            true_count = true_r.scalar() or 0
+            return round((true_count / total) * 100, 1), f"postgres.{table_name}"
+
+        if query_type == "success_rate":
+            total_r = await session.execute(select(func.count()).select_from(model))
+            total = total_r.scalar() or 0
+            if total == 0:
+                return 100.0, f"postgres.{table_name}"
             success_r = await session.execute(
-                select(func.count()).select_from(MCPCallLog).where(
-                    MCPCallLog.status == "success"
-                )
+                select(func.count()).select_from(model).where(model.status == "success")
             )
             success = success_r.scalar() or 0
-            return round((success / total) * 100, 1), "postgres.mcp_call_log"
+            return round((success / total) * 100, 1), f"postgres.{table_name}"
 
-        if table == "mcp_call_log" and query_type == "denied_count":
+        if query_type == "distinct_live":
             result = await session.execute(
-                select(func.count()).select_from(MCPCallLog).where(
-                    MCPCallLog.status == "denied"
-                )
+                select(func.count(func.distinct(KPISnapshotModel.module_id)))
+                .select_from(KPISnapshotModel)
+                .where(KPISnapshotModel.truth_label == "LIVE")
             )
-            return float(result.scalar() or 0), "postgres.mcp_call_log"
+            return float(result.scalar() or 0), f"postgres.{table_name}"
 
-        if table == "nobleport_module_registry" and query_type == "truth_ratio":
-            result = await session.execute(
-                select(func.count()).select_from(NoblePortModuleRegistry).where(
-                    NoblePortModuleRegistry.truth_label == "LIVE"
-                )
-            )
-            live = result.scalar() or 0
-            return float(live), "postgres.nobleport_module_registry"
-
-        if table == "kpi_snapshot" and query_type == "live_count":
-            result = await session.execute(
-                select(func.count(func.distinct(KPISnapshotModel.module_id))).select_from(
-                    KPISnapshotModel
-                ).where(KPISnapshotModel.truth_label == "LIVE")
-            )
-            return float(result.scalar() or 0), "postgres.kpi_snapshot"
+        if query_type == "revenue_spine":
+            leads = await session.execute(select(func.count()).select_from(Lead))
+            jobs = await session.execute(select(func.count()).select_from(Job))
+            l_count = leads.scalar() or 0
+            j_count = jobs.scalar() or 0
+            rate = round((j_count / l_count) * 100, 1) if l_count > 0 else 0.0
+            return rate, "postgres.leads+jobs"
 
     except Exception:
         return None, None
