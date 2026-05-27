@@ -1,7 +1,7 @@
 """
 NoblePort Database Models
 
-All SQLAlchemy models for the NoblePort revenue engine.
+All SQLAlchemy models for the NoblePort revenue engine and MCP operating model.
 Import all models here so Base.metadata.create_all() picks them up.
 """
 
@@ -16,3 +16,10 @@ from backend.models.schedule import ScheduleItem  # noqa: F401
 from backend.models.selection import Selection  # noqa: F401
 from backend.models.daily_log import DailyLog  # noqa: F401
 from backend.models.media import MediaFile, MediaFolder, PhotoAnnotation  # noqa: F401
+from backend.models.mcp import (  # noqa: F401
+    MCPAgentRegistry,
+    MCPToolRegistry,
+    NoblePortModuleRegistry,
+    MCPCallLog,
+    KPISnapshot,
+)

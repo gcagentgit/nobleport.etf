@@ -37,8 +37,14 @@ from backend.api.payments import router as payments_router
 from backend.api.change_orders import router as change_orders_router
 from backend.api.revenue import router as revenue_router
 from backend.api.dashboard import router as dashboard_router
+from backend.api.mcp_gateway import router as mcp_router
+from backend.api.kpi import router as kpi_router
+from backend.api.audit_api import router as audit_router
 from backend.config.database import init_db
+from backend.config.module_registry import AGENT_DEFINITIONS
 from backend.config.settings import settings
+from backend.mcp.gateway import gateway as mcp_gateway
+from backend.services.kpi_worker import kpi_worker
 from backend.services.sync_engine import SyncEngine
 from backend.services.hubspot_sync import HubSpotSyncService
 import backend.models  # noqa: F401 - ensure all models registered with Base
@@ -48,6 +54,17 @@ import backend.models  # noqa: F401 - ensure all models registered with Base
 async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle."""
     await init_db()
+
+    # Register MCP agents
+    for agent_def in AGENT_DEFINITIONS:
+        mcp_gateway.register_agent(
+            agent_name=agent_def["agent_name"],
+            endpoint=agent_def["endpoint"],
+            owner_domain=agent_def["owner_domain"],
+        )
+
+    # Initial KPI collection (all modules start BLOCKED)
+    await kpi_worker.collect_all()
 
     sync_engine = SyncEngine()
     app.state.sync_engine = sync_engine
@@ -105,6 +122,9 @@ app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
 app.include_router(change_orders_router, prefix="/api/change-orders", tags=["Change Orders (AWO)"])
 app.include_router(revenue_router, prefix="/api/revenue", tags=["Revenue Engine"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["Mission Control"])
+app.include_router(mcp_router, prefix="/api/mcp", tags=["MCP Gateway"])
+app.include_router(kpi_router, prefix="/api/kpi", tags=["KPI Dashboard"])
+app.include_router(audit_router, prefix="/api/audit", tags=["AuditBeacon"])
 
 
 if __name__ == "__main__":
