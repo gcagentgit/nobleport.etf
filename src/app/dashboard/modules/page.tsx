@@ -68,7 +68,7 @@ export default function ModulesPage() {
             <Panel
               key={layer}
               title={`${layer} Layer`}
-              subtitle={`${modules.length} modules · all ${modules.every((m) => m.truth_label === 'BLOCKED') ? 'BLOCKED until telemetry connected' : 'mixed'}`}
+              subtitle={`${modules.length} modules · ${modules.filter((m) => m.truth_label === 'LIVE').length} LIVE · ${modules.filter((m) => m.truth_label === 'BLOCKED').length} BLOCKED`}
             >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

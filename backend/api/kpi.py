@@ -18,7 +18,7 @@ from backend.config.module_registry import (
     get_modules_by_agent,
     get_modules_by_layer,
 )
-from backend.services.kpi_worker import kpi_worker
+from backend.services.kpi_worker import TABLE_QUERY_MAP, kpi_worker
 
 router = APIRouter()
 
@@ -137,5 +137,43 @@ async def get_modules_by_layers():
         layers[m.layer].append(_module_to_dict(m, latest.get(m.module_id)))
     return {
         "layers": layers,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/refresh")
+async def refresh_kpi():
+    """Trigger a manual KPI collection cycle."""
+    readings = await kpi_worker.collect_all()
+    summary = kpi_worker.get_truth_summary()
+    return {
+        "collected": len(readings),
+        "summary": summary,
+        "refreshed_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/wiring")
+async def get_wiring_status():
+    """Show which modules have source tables wired vs blocked."""
+    wired = sorted(TABLE_QUERY_MAP.keys())
+    all_ids = [m.module_id for m in MODULE_DEFINITIONS]
+    blocked = [mid for mid in all_ids if mid not in TABLE_QUERY_MAP]
+
+    wired_modules = [
+        {"module_id": m.module_id, "module_name": m.module_name, "source_table": m.source_table}
+        for m in MODULE_DEFINITIONS
+        if m.module_id in TABLE_QUERY_MAP
+    ]
+    blocked_modules = [
+        {"module_id": m.module_id, "module_name": m.module_name, "blocked_reason": m.blocked_reason, "next_action": m.next_action}
+        for m in MODULE_DEFINITIONS
+        if m.module_id not in TABLE_QUERY_MAP
+    ]
+
+    return {
+        "wired": {"count": len(wired), "modules": wired_modules},
+        "blocked": {"count": len(blocked), "modules": blocked_modules},
+        "total": len(MODULE_DEFINITIONS),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
