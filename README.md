@@ -1,12 +1,19 @@
-# Noble Port ETF
+# NoblePort Ecosystem
 
-**Blockchain-Enabled Real Estate ETF Integration**
+**Blockchain-Enabled Real Estate & Mobility Infrastructure**
 
-This repository contains the infrastructure for integrating Noble Port Realty's tokenized real estate assets with traditional Exchange-Traded Fund (ETF) structures, bridging decentralized finance with institutional investment vehicles.
+This repository contains infrastructure for the NoblePort ecosystem, including:
 
-## 🎯 Overview
+- **Noble Port Fund** — Tokenized real estate Reg D private placement
+- **NobleRide.io** — Blockchain-verified ridesharing platform
 
-Noble Port ETF enables institutional investors to gain exposure to tokenized real estate through familiar ETF structures while maintaining the transparency and compliance benefits of blockchain technology.
+---
+
+## Noble Port Fund
+
+### Overview
+
+Noble Port Fund enables accredited investors to gain exposure to tokenized real estate through a Reg D 506(b) private placement while maintaining the transparency and compliance benefits of blockchain technology.
 
 ### Key Features
 
@@ -301,6 +308,44 @@ Cryptographic identity verification through ENS-based Decentralized Identifiers 
 - Governance participation
 
 See [docs/architecture/ssi-ens-integration.md](docs/architecture/ssi-ens-integration.md) for implementation details.
+
+---
+
+## NobleRide.io
+
+Blockchain-verified ridesharing platform with strict driver safety requirements.
+
+### Core Requirement
+
+**No speeding tickets or moving violations in the last 2 consecutive years.**
+
+### Features
+
+- **On-chain verification** — Driving records verified by oracle, stored on blockchain
+- **Background checks** — Full background verification before driver approval
+- **Passenger preferences** — Optional filter for women drivers
+- **Transparent ratings** — Completed rides and ratings visible on-chain
+
+### Verification Flow
+
+```
+Register → DMV Record Check → 2-Year Clean? → Background Check → Verified
+                                   ↓
+                              RecordFailed
+```
+
+### File Structure
+
+```
+nobleride/
+├── contracts/NobleRide.sol              # Smart contract
+├── services/drivingRecordVerification.ts # DMV integration
+└── components/NobleRideApp.tsx          # React frontend
+```
+
+See [docs/architecture/nobleride-driver-verification.md](docs/architecture/nobleride-driver-verification.md) for full architecture.
+
+---
 
 ## 📞 Contact & Resources
 
