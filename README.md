@@ -278,293 +278,50 @@ npm run ap-portal
 - Approve rebalancing strategies
 - Elect advisory board members
 
-## 🛠️ Bookkeeper & CPA Operations Infrastructure
+## 🛠️ Bookkeeper & CPA Operations
 
-Noble Port ETF requires robust accounting and compliance infrastructure to support institutional investors and regulatory requirements. This section outlines both the technology stack for operational efficiency and the full-stack service model for comprehensive financial management.
+Comprehensive accounting and compliance infrastructure supporting institutional investors and regulatory requirements.
 
-### Technology Stack
+**Key Capabilities:**
+- Core accounting integration (QuickBooks, Xero, Sage Intacct)
+- Practice and workflow management
+- NAV calculation support and regulatory reporting
+- Investor services and tax documentation
 
-The goal is to assemble a lean collection of integrated applications that maximize impact on core workflows while accepting some functional overlap between tools.
-
-#### 1. Core Accounting & Bookkeeping
-
-Foundational software for managing client and fund finances.
-
-| Platform | Strength | Best For |
-|----------|----------|----------|
-| QuickBooks Online | Comprehensive features, extensive integrations | US-based operations, small to mid-size |
-| Xero | Collaboration features, global presence | International operations, multi-currency |
-| Sage Intacct | Advanced multi-entity management | Mid-sized to larger firms, complex structures |
-
-#### 2. Practice & Workflow Management
-
-Central hub for managing projects, deadlines, and team coordination.
-
-| Platform | Key Features |
-|----------|--------------|
-| Karbon | All-in-one practice management with built-in CRM and workflow automation |
-| Financial Cents | User-friendly practice management with client relationship features |
-| Canopy | Robust features for tax resolution and practice management |
-
-#### 3. Document & Client Management
-
-Secure storage, sharing, and streamlined client communication.
-
-**Dedicated Client Portals**
-- Liscio, Assembly: Specialized tools for secure messaging, file sharing, and task management
-- Reduces email overload and improves client experience
-
-**Cloud Storage Solutions**
-- Google Drive, Dropbox, SmartVault: Universal platforms for document collaboration
-- Integration with core accounting software
-
-#### 4. Specialized & Supporting Tools
-
-**Expense Management**
-- Expensify: Automated receipt capture and expense reporting
-- Bill.com: AP/AR automation and payment processing
-
-**Proposals & Billing**
-- Ignition: Professional proposals, engagement letters, automated client billing
-
-**Security**
-- LastPass, 1Password: Critical for securing sensitive client login information
-- Multi-factor authentication across all platforms
-
-### Full-Stack Service Model
-
-A bundled offering where a single provider handles everything from daily bookkeeping to high-level CPA advisory work, providing clients with a seamless, integrated finance function.
-
-#### Service Tiers
-
-**Tier 1: Foundational Bookkeeping**
-- Daily transaction recording and categorization
-- Account reconciliation (bank, credit card, loan)
-- Monthly financial statement preparation
-- Cash flow monitoring and alerts
-
-**Tier 2: Compliance & Tax Services**
-- Business tax return preparation and filing (1120, 1120-S, 1065)
-- Sales tax compliance and filing
-- 1099 management and issuance
-- Quarterly estimated tax calculations
-- State and local tax compliance
-
-**Tier 3: Advisory & CFO Services**
-- Cash flow forecasting and management
-- Financial planning & analysis (FP&A)
-- Audit preparation and support
-- R&D tax credit studies
-- Strategic financial consulting
-- Board and investor reporting
-
-### Integration with ETF Operations
-
-**NAV Calculation Support**
-- Daily reconciliation of blockchain transactions with accounting records
-- Automated fee calculation and accrual
-- Multi-currency handling for international properties
-
-**Regulatory Reporting**
-- SEC filing preparation (N-PORT, N-CEN, Form 24F-2)
-- Tax document generation (1099-DIV, Schedule K-1)
-- Audit trail maintenance for compliance verification
-
-**Investor Services**
-- Dividend distribution tracking
-- Tax lot accounting
-- Cost basis reporting
-- Annual tax statement preparation
-
-### Implementation Considerations
-
-**Start with Workflows**
-- Identify time-consuming processes (month-end close, client onboarding)
-- Choose technology that solves specific pain points
-
-**Prioritize Integration**
-- Ensure applications communicate seamlessly
-- Expense tools should sync with core accounting software
-- Practice management should integrate with document storage
-
-**Security is Non-Negotiable**
-- Robust security practices for all client financial data
-- Regular security audits and penetration testing
-- Compliance with SOC 2 Type II standards
-
-### Getting Started Checklist
-
-```
-□ Audit current workflows and identify bottlenecks
-□ Define technology vs. service needs
-□ Select core accounting platform (QuickBooks/Xero/Sage)
-□ Implement practice management solution
-□ Set up secure document management
-□ Configure expense and billing automation
-□ Establish security protocols and access controls
-□ Train team on integrated workflows
-□ Monitor and optimize quarterly
-```
+See [docs/architecture/bookkeeper-cpa-operations.md](docs/architecture/bookkeeper-cpa-operations.md) for full details.
 
 ## 🔐 Self-Sovereign Identity (SSI) & ENS Integration
 
-NoblePort ETF leverages Self-Sovereign Identity (SSI) principles through ENS-based Decentralized Identifiers (DIDs) to provide cryptographic identity verification for all ecosystem participants.
+Cryptographic identity verification through ENS-based Decentralized Identifiers (DIDs).
 
-### ENS DID Architecture
+**Key Capabilities:**
+- DID resolution for `did:ens:nobleport.eth`
+- Investor identity verification
+- Asset provenance tracking
+- Governance participation
 
-```
-NoblePort SSI Layer
-├── Identity Resolution
-│   ├── did:ens:nobleport.eth (Root Identity)
-│   ├── did:ens:etf.nobleport.eth (ETF Identity)
-│   └── Subname DIDs for properties/participants
-│
-├── Resolution Stack
-│   ├── did-resolver (Universal DID resolution)
-│   ├── ens-did-resolver (ENS-specific resolver)
-│   └── ethers.js (Ethereum provider)
-│
-└── Verification Layer
-    ├── DID Documents
-    ├── Verification Methods
-    └── Service Endpoints
-```
-
-### Installation
-
-```bash
-# Install ENS DID resolver dependencies
-npm install ens-did-resolver did-resolver ethers
-```
-
-### Usage
-
-**Resolve NoblePort Root DID:**
-
-```typescript
-import { resolveEnsDid, NOBLEPORT_ENS } from './src/lib/ensDidResolver';
-
-// Resolve the NoblePort root DID
-const didDocument = await resolveEnsDid('did:ens:nobleport.eth');
-console.log(didDocument.verificationMethod);
-```
-
-**Resolve ENS Address:**
-
-```typescript
-import { resolveEnsAddress } from './src/lib/ensDidResolver';
-
-// Get Ethereum address for ENS name
-const address = await resolveEnsAddress('nobleport.eth');
-// Returns '0x...' or null
-```
-
-**Get ENS Text Records:**
-
-```typescript
-import { getEnsTextRecords } from './src/lib/ensDidResolver';
-
-// Fetch text records
-const records = await getEnsTextRecords('nobleport.eth', [
-  'url',
-  'email',
-  'description',
-  'com.twitter',
-  'com.github',
-]);
-```
-
-### Configuration
-
-Create a `.env` file with your Ethereum provider credentials:
-
-```bash
-# .env
-NEXT_PUBLIC_INFURA_ID=your_infura_project_id
-# Or use Alchemy
-NEXT_PUBLIC_ALCHEMY_KEY=your_alchemy_key
-```
-
-### SSI Dashboard
-
-The NoblePort SSI Architecture dashboard (`src/components/NoblePortSSIArchitecture.tsx`) provides:
-
-- **Identity Resolution**: Resolve any ENS name to its DID Document
-- **Address Lookup**: View associated Ethereum addresses
-- **Text Records**: Display ENS profile information
-- **Architecture Visualization**: Interactive SSI flow diagram
-
-### DID Document Structure
-
-A resolved `did:ens:nobleport.eth` returns a DID Document containing:
-
-```json
-{
-  "id": "did:ens:nobleport.eth",
-  "verificationMethod": [
-    {
-      "id": "did:ens:nobleport.eth#controller",
-      "type": "EcdsaSecp256k1RecoveryMethod2020",
-      "controller": "did:ens:nobleport.eth",
-      "blockchainAccountId": "eip155:1:0x..."
-    }
-  ],
-  "authentication": ["did:ens:nobleport.eth#controller"],
-  "service": [
-    {
-      "id": "did:ens:nobleport.eth#website",
-      "type": "LinkedDomains",
-      "serviceEndpoint": "https://nobleport.etf"
-    }
-  ]
-}
-```
-
-### Integration with ETF Operations
-
-**Investor Verification**
-- Verify investor identities through their ENS DIDs
-- Cryptographic proof of accreditation status
-- Automated KYC/AML compliance through DID credentials
-
-**Asset Provenance**
-- Each tokenized property has an associated DID
-- Verifiable credentials for property documentation
-- Immutable audit trail on Ethereum
-
-**Governance Participation**
-- DID-based voting for NBPT token holders
-- Verifiable delegation of voting rights
-- Transparent governance record
-
-### Resources
-
-- [DID:ENS Method Specification](https://github.com/veramolabs/did-ens-spec)
-- [ENS DID Resolver](https://github.com/veramolabs/ens-did-resolver)
-- [ENS Documentation](https://docs.ens.domains/)
-- [DID Core Specification](https://www.w3.org/TR/did-core/)
+See [docs/architecture/ssi-ens-integration.md](docs/architecture/ssi-ens-integration.md) for implementation details.
 
 ## 📞 Contact & Resources
 
 **Website:** [nobleport.etf](https://nobleport.etf)  
 **Holdings Dashboard:** [holdings.nobleport.etf](https://holdings.nobleport.etf)  
-**Prospectus:** [prospectus.nobleport.etf](https://prospectus.nobleport.etf)  
+**Private Placement Memorandum:** Available to verified accredited investors  
 **Investor Relations:** [email protected]
 
-**Authorized Participant Portal:** [ap.nobleport.etf](https://ap.nobleport.etf)  
-**Custodian:** [Institutional Custodian Name]  
+**Custodian:** [Qualified Custodian Name]  
 **Transfer Agent:** [Transfer Agent Name]  
-**Auditor:** [Big Four Accounting Firm]
+**Auditor:** [Accounting Firm]
 
 ## 📄 License
 
-Copyright © 2025 Noble Port Realty. All rights reserved.
+Copyright © 2025-2026 Noble Port Realty. All rights reserved.
 
-This repository contains proprietary code and documentation for a registered investment company. Unauthorized copying, modification, distribution, or use is strictly prohibited.
+This repository contains proprietary code and documentation for a Reg D 506(b) private investment fund. Unauthorized copying, modification, distribution, or use is strictly prohibited.
 
 ---
 
 **Bridging Traditional Finance and Blockchain Innovation**
 
-*Noble Port ETF is part of the NoblePort Systems ecosystem, leveraging blockchain technology to enhance transparency and efficiency in traditional investment vehicles.*
+*Noble Port Fund is part of the NoblePort Systems ecosystem, leveraging blockchain technology to enhance transparency and efficiency in private investment vehicles.*
 
