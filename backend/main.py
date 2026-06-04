@@ -31,10 +31,13 @@ from backend.api.payments import router as payments_router
 from backend.api.change_orders import router as change_orders_router
 from backend.api.revenue import router as revenue_router
 from backend.api.dashboard import router as dashboard_router
+from backend.api.trust import router as trust_router
+from backend.api.ops_brief import router as ops_brief_router
 from backend.config.database import init_db
 from backend.config.settings import settings
 from backend.services.sync_engine import SyncEngine
 from backend.services.hubspot_sync import HubSpotSyncService
+from backend.agents.orchestrator import AgentMesh
 import backend.models  # noqa: F401 - ensure all models registered with Base
 
 
@@ -48,6 +51,9 @@ async def lifespan(app: FastAPI):
 
     hubspot_sync = HubSpotSyncService()
     app.state.hubspot_sync = hubspot_sync
+
+    agent_mesh = AgentMesh()
+    app.state.agent_mesh = agent_mesh
 
     if settings.buildertrend_sync_mode.value == "scheduled":
         await sync_engine.start_scheduled_sync()
@@ -64,13 +70,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="NoblePort Backend",
+    title="NoblePort OS",
     description=(
-        "Python/Linux backend for NoblePort Networks. "
-        "Provides construction project management APIs, Buildertrend integration bridge, "
-        "and data sync services connecting to the NoblePort ETF tokenization platform."
+        "AI-operated infrastructure for construction, permitting, estimating, "
+        "compliance, payments, and project execution. Powered by Stephanie.ai "
+        "(intake/routing), GCagent.ai (construction execution), PermitStream.ai "
+        "(permit/compliance), Cyborg.ai (security/governance), and AuditBeacon "
+        "(immutable operational memory)."
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -99,6 +107,8 @@ app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
 app.include_router(change_orders_router, prefix="/api/change-orders", tags=["Change Orders (AWO)"])
 app.include_router(revenue_router, prefix="/api/revenue", tags=["Revenue Engine"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["Mission Control"])
+app.include_router(trust_router, prefix="/api/trust", tags=["Proof of Trust"])
+app.include_router(ops_brief_router, prefix="/api/ops-brief", tags=["Stephanie Ops Brief"])
 
 
 if __name__ == "__main__":
