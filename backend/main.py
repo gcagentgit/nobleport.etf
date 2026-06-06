@@ -27,6 +27,16 @@ from backend.api.revenue import router as revenue_router
 from backend.api.dashboard import router as dashboard_router
 from backend.api.trust import router as trust_router
 from backend.api.ops_brief import router as ops_brief_router
+from backend.domains.intake import router as intake_router
+from backend.domains.leads import router as leads_domain_router
+from backend.domains.jobs import router as jobs_domain_router
+from backend.domains.workflows import router as workflows_router
+from backend.domains.marketing import router as marketing_router
+from backend.domains.follow_ups import router as follow_ups_router
+from backend.domains.contacts import router as contacts_router
+from backend.domains.permits import router as permits_router
+from backend.domains.subcontractors import router as subcontractors_router
+from backend.domains.construction import router as construction_router
 from backend.config.database import init_db
 from backend.config.settings import settings
 from backend.services.sync_engine import SyncEngine
@@ -103,6 +113,18 @@ app.include_router(revenue_router, prefix="/api/revenue", tags=["Revenue Engine"
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["Mission Control"])
 app.include_router(trust_router, prefix="/api/trust", tags=["Proof of Trust"])
 app.include_router(ops_brief_router, prefix="/api/ops-brief", tags=["Stephanie Ops Brief"])
+
+# Business domain routes
+app.include_router(intake_router, prefix="/api/domains/intake", tags=["Domain: Intake"])
+app.include_router(leads_domain_router, prefix="/api/domains/leads", tags=["Domain: Leads"])
+app.include_router(jobs_domain_router, prefix="/api/domains/jobs", tags=["Domain: Jobs"])
+app.include_router(workflows_router, prefix="/api/domains/workflows", tags=["Domain: Workflows"])
+app.include_router(marketing_router, prefix="/api/domains/marketing", tags=["Domain: Marketing"])
+app.include_router(follow_ups_router, prefix="/api/domains/follow-ups", tags=["Domain: Follow-Ups"])
+app.include_router(contacts_router, prefix="/api/domains/contacts", tags=["Domain: Contacts"])
+app.include_router(permits_router, prefix="/api/domains/permits", tags=["Domain: Permits"])
+app.include_router(subcontractors_router, prefix="/api/domains/subcontractors", tags=["Domain: Subcontractors"])
+app.include_router(construction_router, prefix="/api/domains/construction", tags=["Domain: Construction"])
 
 
 if __name__ == "__main__":

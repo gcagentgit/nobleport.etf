@@ -20,3 +20,32 @@ from backend.models.trust_record import TrustRecord  # noqa: F401
 from backend.models.permit import Permit  # noqa: F401
 from backend.models.inspection import Inspection  # noqa: F401
 from backend.models.maintenance import MaintenanceContract  # noqa: F401
+
+# Domain models — registered so Base.metadata.create_all() picks them up.
+from backend.domains.contacts.models import (  # noqa: F401
+    Contact,
+    ContactInteraction,
+    ContactRelationship,
+)
+from backend.domains.follow_ups.models import (  # noqa: F401
+    FollowUpInstance,
+    FollowUpSequence,
+    FollowUpStep,
+)
+from backend.domains.marketing.models import (  # noqa: F401
+    Campaign,
+    LeadAttribution,
+    MarketingAsset,
+)
+from backend.domains.subcontractors.models import (  # noqa: F401
+    Subcontractor,
+    SubcontractorAssignment,
+    SubcontractorBid,
+    SubcontractorPayment,
+)
+from backend.domains.workflows.models import (  # noqa: F401
+    WorkflowInstance,
+    WorkflowStep,
+    WorkflowStepExecution,
+    WorkflowTemplate,
+)
