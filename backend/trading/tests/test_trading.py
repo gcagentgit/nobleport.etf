@@ -319,6 +319,16 @@ def test_backtester_runs_and_scores():
     assert isinstance(result.summary(), str)
 
 
+def test_backtester_restores_log_level():
+    import logging
+    pkg = logging.getLogger("backend.trading")
+    pkg.setLevel(logging.INFO)
+    cfg = _cfg(symbols=["BTC/USDT"], fast_ema=5, slow_ema=12,
+               rsi_overbought=95.0, rsi_oversold=5.0)
+    Backtester(cfg, {"BTC/USDT": _candles(_osc_closes())}).run()
+    assert pkg.level == logging.INFO  # restored after the quiet block
+
+
 # --------------------------------------------------------------------------- #
 # Data I/O
 # --------------------------------------------------------------------------- #

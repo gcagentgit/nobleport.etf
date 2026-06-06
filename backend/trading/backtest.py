@@ -13,13 +13,27 @@ Sharpe, win rate, max drawdown, etc.
 
 from __future__ import annotations
 
+import logging
 import math
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 from .bot import OctaStackTrader
 from .broker import Candles, MarketData, PaperBroker
 from .config import TradingConfig
 from .strategy import Strategy, build_strategy
+
+
+@contextmanager
+def _quiet_engine_logs():
+    """Silence the engine's per-bar INFO/trade logs during a backtest run."""
+    pkg_logger = logging.getLogger("backend.trading")
+    previous = pkg_logger.level
+    pkg_logger.setLevel(logging.WARNING)
+    try:
+        yield
+    finally:
+        pkg_logger.setLevel(previous)
 
 
 class _ReplayMarketData(MarketData):
@@ -113,17 +127,18 @@ class Backtester:
         initial_equity = self.cfg.starting_paper_balance
         equity_curve: list[float] = []
 
-        for t in range(start, n):
-            self._market.index = t
-            self.engine.step()
-            equity_curve.append(self._mark_to_market())
+        with _quiet_engine_logs():
+            for t in range(start, n):
+                self._market.index = t
+                self.engine.step()
+                equity_curve.append(self._mark_to_market())
 
-        # Force-close anything still open at the final bar.
-        self._market.index = n - 1
-        for symbol in list(self.engine.positions):
-            self.engine.close_position(
-                symbol, self._market.fetch_price(symbol), "backtest_end"
-            )
+            # Force-close anything still open at the final bar.
+            self._market.index = n - 1
+            for symbol in list(self.engine.positions):
+                self.engine.close_position(
+                    symbol, self._market.fetch_price(symbol), "backtest_end"
+                )
         final_equity = self._mark_to_market()
         equity_curve.append(final_equity)
 
