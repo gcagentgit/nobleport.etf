@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from .broker import Broker, MarketData, Position, TakeProfitTier
 from .config import TradingConfig
 from .risk import position_size, stop_loss_price, take_profit_price
-from .strategy import EmaCrossoverStrategy, Signal
+from .strategy import Signal, Strategy, build_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -41,20 +41,17 @@ class OctaStackTrader:
         config: TradingConfig,
         market: MarketData,
         broker: Broker,
-        strategy: EmaCrossoverStrategy | None = None,
+        strategy: Strategy | None = None,
     ) -> None:
         self.cfg = config
         self.market = market
         self.broker = broker
-        self.strategy = strategy or EmaCrossoverStrategy(
-            fast_ema=config.fast_ema,
-            slow_ema=config.slow_ema,
-            rsi_period=config.rsi_period,
-            rsi_overbought=config.rsi_overbought,
-            rsi_oversold=config.rsi_oversold,
-        )
+        self.strategy = strategy or build_strategy(config)
         self.positions: dict[str, Position] = {}
         self.last_signal: dict[str, Signal] = {}
+        # Optional callback invoked on every fill: fn(dict). Used by the
+        # backtester to collect per-trade P&L without touching the CSV log.
+        self.on_fill = None
         self._ensure_log_header()
 
     # ------------------------------------------------------------------ #
@@ -133,6 +130,11 @@ class OctaStackTrader:
             datetime.now(timezone.utc).isoformat(), symbol, "BUY", "signal",
             f"{price:.8f}", "", f"{qty:.8f}", "",
         ])
+        if self.on_fill:
+            self.on_fill({
+                "symbol": symbol, "side": "buy", "qty": qty,
+                "price": price, "reason": "signal", "pnl": 0.0,
+            })
         logger.info(
             "Opened %s: qty=%.8f entry=%.6f SL=%.6f TP=%s",
             symbol, qty, price, pos.stop_loss,
@@ -151,6 +153,11 @@ class OctaStackTrader:
             datetime.now(timezone.utc).isoformat(), pos.symbol, "SELL", reason,
             f"{pos.entry_price:.8f}", f"{price:.8f}", f"{qty:.8f}", f"{pnl:.2f}",
         ])
+        if self.on_fill:
+            self.on_fill({
+                "symbol": pos.symbol, "side": "sell", "qty": qty,
+                "price": price, "reason": reason, "pnl": pnl,
+            })
         logger.info(
             "%s %s qty=%.8f @ %.6f pnl=%.2f %s",
             reason.upper(), pos.symbol, qty, price, pnl, self.cfg.quote_currency,
@@ -192,18 +199,18 @@ class OctaStackTrader:
         """Run one full evaluation pass across all configured symbols."""
         for symbol in self.cfg.symbols:
             try:
-                closes = self.market.fetch_closes(
-                    symbol, self.cfg.timeframe, limit=max(100, self.strategy.min_candles)
+                candles = self.market.fetch_ohlcv(
+                    symbol, self.cfg.timeframe, limit=max(200, self.strategy.min_candles)
                 )
             except Exception as exc:
                 logger.error("Failed to fetch data for %s: %s", symbol, exc)
                 continue
 
-            if not closes:
+            if not candles or len(candles) == 0:
                 continue
 
-            signal = self.strategy.generate(closes)
-            price = closes[-1]
+            signal = self.strategy.generate(candles)
+            price = candles.close[-1]
 
             # De-dupe: ignore a repeat of the same actionable signal.
             if signal is not Signal.HOLD and self.last_signal.get(symbol) == signal:

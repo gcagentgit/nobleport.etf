@@ -72,11 +72,18 @@ class TradingConfig:
     quote_currency: str = "USDT"
 
     # -- Strategy ---------------------------------------------------------
+    strategy: str = "ema"  # "ema" or "supertrend_adx"
+    # EMA crossover
     fast_ema: int = 10
     slow_ema: int = 30
     rsi_period: int = 14
     rsi_overbought: float = 70.0
     rsi_oversold: float = 30.0
+    # SuperTrend + ADX ("David's approach")
+    supertrend_period: int = 10
+    supertrend_multiplier: float = 3.0
+    adx_period: int = 14
+    adx_threshold: float = 25.0
 
     # -- Risk management --------------------------------------------------
     max_positions: int = 8
@@ -115,11 +122,16 @@ class TradingConfig:
             symbols=symbols,
             timeframe=os.getenv("TIMEFRAME", "1h"),
             quote_currency=os.getenv("QUOTE_CURRENCY", "USDT"),
+            strategy=os.getenv("STRATEGY", "ema"),
             fast_ema=_get_int("FAST_EMA", 10),
             slow_ema=_get_int("SLOW_EMA", 30),
             rsi_period=_get_int("RSI_PERIOD", 14),
             rsi_overbought=_get_float("RSI_OVERBOUGHT", 70.0),
             rsi_oversold=_get_float("RSI_OVERSOLD", 30.0),
+            supertrend_period=_get_int("SUPERTREND_PERIOD", 10),
+            supertrend_multiplier=_get_float("SUPERTREND_MULTIPLIER", 3.0),
+            adx_period=_get_int("ADX_PERIOD", 14),
+            adx_threshold=_get_float("ADX_THRESHOLD", 25.0),
             max_positions=_get_int("MAX_POSITIONS", 8),
             risk_per_trade=_get_float("RISK_PER_TRADE", 0.02),
             stop_loss_pct=_get_float("STOP_LOSS_PCT", 0.05),

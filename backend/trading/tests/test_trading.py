@@ -9,24 +9,42 @@ from __future__ import annotations
 
 import math
 
+from backend.trading.backtest import Backtester
 from backend.trading.bot import OctaStackTrader
-from backend.trading.broker import MarketData, PaperBroker
+from backend.trading.broker import Candles, MarketData, PaperBroker
 from backend.trading.config import TradingConfig
-from backend.trading.indicators import ema, rsi
+from backend.trading.indicators import adx, atr, ema, rsi, supertrend
 from backend.trading.risk import position_size, stop_loss_price, take_profit_price
-from backend.trading.strategy import EmaCrossoverStrategy, Signal
+from backend.trading.strategy import (
+    EmaCrossoverStrategy,
+    Signal,
+    SupertrendAdxStrategy,
+)
 
 
 # --------------------------------------------------------------------------- #
-# Stubs
+# Helpers / stubs
 # --------------------------------------------------------------------------- #
+def _candles(closes: list[float]) -> Candles:
+    """Candles where O/H/L/C all track close (fine for close-only strategies)."""
+    closes = [float(c) for c in closes]
+    return Candles(
+        timestamp=list(range(len(closes))),
+        open=list(closes),
+        high=list(closes),
+        low=list(closes),
+        close=list(closes),
+        volume=[0.0] * len(closes),
+    )
+
+
 class StubMarketData(MarketData):
     def __init__(self, closes: list[float], price: float | None = None) -> None:
-        self.closes = closes
-        self.price = price if price is not None else closes[-1]
+        self.candles = _candles(closes)
+        self.price = price if price is not None else float(closes[-1])
 
-    def fetch_closes(self, symbol, timeframe, limit):
-        return self.closes
+    def fetch_ohlcv(self, symbol, timeframe, limit):
+        return self.candles
 
     def fetch_price(self, symbol):
         return self.price
@@ -101,7 +119,7 @@ def test_strategy_buy_on_bullish_crossover():
     # Decline then a sharp rebound forces the fast EMA above the slow EMA
     # exactly on the final bar.
     closes = [10, 9, 8, 7, 6, 5, 6, 8, 11]
-    assert strat.generate([float(c) for c in closes]) is Signal.BUY
+    assert strat.generate(_candles(closes)) is Signal.BUY
 
 
 def test_strategy_sell_on_bearish_crossover():
@@ -110,12 +128,12 @@ def test_strategy_sell_on_bearish_crossover():
         rsi_overbought=200.0, rsi_oversold=-1.0,
     )
     closes = [5, 6, 7, 8, 9, 10, 9, 7, 4]
-    assert strat.generate([float(c) for c in closes]) is Signal.SELL
+    assert strat.generate(_candles(closes)) is Signal.SELL
 
 
 def test_strategy_holds_without_enough_data():
     strat = EmaCrossoverStrategy(fast_ema=10, slow_ema=30)
-    assert strat.generate([1.0, 2.0, 3.0]) is Signal.HOLD
+    assert strat.generate(_candles([1.0, 2.0, 3.0])) is Signal.HOLD
 
 
 # --------------------------------------------------------------------------- #
@@ -220,3 +238,82 @@ def test_config_validation_rejects_bad_emas():
     except ValueError:
         return
     raise AssertionError("expected ValueError for fast_ema >= slow_ema")
+
+
+# --------------------------------------------------------------------------- #
+# SuperTrend / ADX indicators + strategy
+# --------------------------------------------------------------------------- #
+def _ohlc_trend(closes, spread=1.0):
+    closes = [float(c) for c in closes]
+    return Candles(
+        timestamp=list(range(len(closes))),
+        open=list(closes),
+        high=[c + spread for c in closes],
+        low=[c - spread for c in closes],
+        close=list(closes),
+        volume=[0.0] * len(closes),
+    )
+
+
+def test_atr_is_non_negative():
+    c = _ohlc_trend([float(i) for i in range(1, 40)])
+    for v in atr(c.high, c.low, c.close, 14):
+        if v is not None:
+            assert v >= 0.0
+
+
+def test_supertrend_follows_direction():
+    up = _ohlc_trend([100 + i for i in range(40)])
+    st_up = supertrend(up.high, up.low, up.close, 10, 3.0)
+    assert st_up[-1] == 1  # sustained uptrend → bullish
+
+    down = _ohlc_trend([140 - i for i in range(40)])
+    st_down = supertrend(down.high, down.low, down.close, 10, 3.0)
+    assert st_down[-1] == -1
+
+
+def test_adx_high_in_strong_trend():
+    c = _ohlc_trend([100 + i for i in range(60)])
+    vals = [v for v in adx(c.high, c.low, c.close, 14) if v is not None]
+    assert vals, "expected some ADX values"
+    assert max(vals) > 25.0  # a clean linear trend is "strong"
+
+
+def test_supertrend_adx_strategy_buys_on_flip():
+    # Down-trend then a sustained up-trend produces a bullish flip with strong ADX.
+    closes = [140 - i for i in range(30)] + [110 + 2 * i for i in range(30)]
+    strat = SupertrendAdxStrategy(
+        supertrend_period=10, supertrend_multiplier=3.0,
+        adx_period=14, adx_threshold=20.0,
+    )
+    signals = []
+    c = _ohlc_trend(closes)
+    for end in range(strat.min_candles, len(closes) + 1):
+        window = Candles(
+            timestamp=c.timestamp[:end], open=c.open[:end], high=c.high[:end],
+            low=c.low[:end], close=c.close[:end], volume=c.volume[:end],
+        )
+        signals.append(strat.generate(window))
+    assert Signal.BUY in signals
+
+
+# --------------------------------------------------------------------------- #
+# Backtester
+# --------------------------------------------------------------------------- #
+def test_backtester_runs_and_scores():
+    # Oscillating series so EMA crossovers fire repeatedly.
+    closes = []
+    for cycle in range(6):
+        closes += [100 - i for i in range(15)] + [85 + i for i in range(15)]
+    cfg = _cfg(
+        symbols=["BTC/USDT"], fast_ema=5, slow_ema=12, rsi_period=5,
+        rsi_overbought=95.0, rsi_oversold=5.0, starting_paper_balance=10_000.0,
+    )
+    data = {"BTC/USDT": _candles(closes)}
+    result = Backtester(cfg, data).run()
+    assert result.initial_equity == 10_000.0
+    assert len(result.equity_curve) > 0
+    assert result.num_trades >= 1
+    assert 0.0 <= result.win_rate <= 1.0
+    assert result.max_drawdown_pct >= 0.0
+    assert isinstance(result.summary(), str)

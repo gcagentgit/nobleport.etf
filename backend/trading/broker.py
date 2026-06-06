@@ -26,6 +26,34 @@ logger = logging.getLogger(__name__)
 # Position
 # --------------------------------------------------------------------------- #
 @dataclass(slots=True)
+class Candles:
+    """OHLCV history for one symbol, column-oriented for indicator math."""
+
+    timestamp: list[int] = field(default_factory=list)
+    open: list[float] = field(default_factory=list)
+    high: list[float] = field(default_factory=list)
+    low: list[float] = field(default_factory=list)
+    close: list[float] = field(default_factory=list)
+    volume: list[float] = field(default_factory=list)
+
+    def __len__(self) -> int:
+        return len(self.close)
+
+    @classmethod
+    def from_ccxt(cls, rows: list[list[float]]) -> "Candles":
+        """Build from ccxt ``fetch_ohlcv`` rows ``[ts, o, h, l, c, v]``."""
+        c = cls()
+        for ts, o, h, lo, cl, v in rows:
+            c.timestamp.append(int(ts))
+            c.open.append(float(o))
+            c.high.append(float(h))
+            c.low.append(float(lo))
+            c.close.append(float(cl))
+            c.volume.append(float(v))
+        return c
+
+
+@dataclass(slots=True)
 class TakeProfitTier:
     """A single rung of the take-profit ladder."""
 
@@ -64,7 +92,7 @@ class MarketData(ABC):
     """Read-only price / OHLCV feed."""
 
     @abstractmethod
-    def fetch_closes(self, symbol: str, timeframe: str, limit: int) -> list[float]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int) -> Candles:
         ...
 
     @abstractmethod
@@ -168,9 +196,9 @@ class CCXTMarketData(MarketData):  # pragma: no cover - requires network
     def __init__(self, client) -> None:
         self.client = client
 
-    def fetch_closes(self, symbol: str, timeframe: str, limit: int) -> list[float]:
-        candles = self.client.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
-        return [c[4] for c in candles]  # close is index 4
+    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int) -> Candles:
+        rows = self.client.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+        return Candles.from_ccxt(rows)
 
     def fetch_price(self, symbol: str) -> float:
         return float(self.client.fetch_ticker(symbol)["last"])

@@ -1,39 +1,48 @@
 # OctaStackTrader
 
 A production-oriented crypto trading bot for NoblePort. It manages up to **8
-concurrent long positions** (the "8 stack") across a configurable set of pairs
-using a **10/30 EMA crossover** strategy with an **RSI filter**, fixed-percentage
-**risk-based position sizing**, a **5% stop-loss**, and a **5% / 10% take-profit
-ladder**.
+concurrent long positions** (the "8 stack") across a configurable set of pairs,
+with two pluggable strategies, fixed-percentage **risk-based position sizing**, a
+**5% stop-loss**, and a **5% / 10% take-profit ladder**.
 
 It runs **paper (dry-run)** trading out of the box and **live** trading via any
-[ccxt](https://github.com/ccxt/ccxt)-supported exchange (Binance, Kucoin,
-Coinbase, …).
+[ccxt](https://github.com/ccxt/ccxt)-supported exchange (**Bybit**, Binance,
+Kucoin, Coinbase, …), and ships with a **backtester** that replays history
+through the real engine.
 
 ## Features
 
 - **8-position limit** — never holds more than `MAX_POSITIONS` trades at once.
 - **Multi-symbol** — configure any number of pairs (up to the stack limit held
   simultaneously).
-- **Strategy** — 10/30 EMA crossover + RSI overbought/oversold filter.
+- **Two strategies** (`STRATEGY=`):
+  - `ema` — 10/30 EMA crossover + RSI overbought/oversold filter.
+  - `supertrend_adx` — SuperTrend direction gated by ADX trend strength
+    ("David's approach"; great on 4h BTC/ETH/SOL).
 - **Risk management** — fixed % risk per trade, 5% stop-loss, tiered take-profit
   (book half at +5%, the rest at +10% by default), minimum order notional.
+- **Backtesting** — score any strategy/parameter set on historical candles
+  (return, win rate, profit factor, max drawdown, Sharpe) using the *same*
+  engine that trades live.
 - **Dry-run mode** — simulate trades against *live* prices with a virtual
   balance.
 - **CSV trade logging** — every fill is recorded to `trading_log.csv`.
-- **Dependency-light core** — indicators, strategy, risk and the paper broker
-  are pure Python (no pandas/numpy); `ccxt` is only imported for live trading.
+- **Dependency-light core** — indicators, strategies, risk, paper broker and
+  backtester are pure Python (no pandas/numpy); `ccxt` is only imported for live
+  trading.
 
 ## Architecture
 
 ```
 config.py      TradingConfig — env-driven, validated configuration
-indicators.py  ema(), rsi() — pure-Python technical indicators
-strategy.py    EmaCrossoverStrategy → Signal (BUY / SELL / HOLD)
+indicators.py  ema, rsi, atr, supertrend, adx — pure-Python indicators
+strategy.py    EmaCrossover + SupertrendAdx strategies, build_strategy()
 risk.py        position sizing + stop-loss / take-profit price math
-broker.py      Position, MarketData + Broker interfaces,
+broker.py      Candles, Position, MarketData + Broker interfaces,
                PaperBroker (sim) and CCXT{MarketData,Broker} (live)
 bot.py         OctaStackTrader — the engine (step() / run())
+backtest.py    Backtester — replays history through the real engine
+strategy.pine  TradingView Pine Script mirror of the SuperTrend+ADX logic
 __main__.py    CLI wiring (ccxt feed → paper/live broker → engine)
 ```
 
@@ -75,6 +84,39 @@ python -m backend.trading
 
 Start with `DRY_RUN=true` and `TESTNET=true`. Only set `DRY_RUN=false` after you
 have validated behaviour on the testnet with small size.
+
+## Backtest
+
+```python
+from backend.trading import TradingConfig, Backtester, Candles
+
+cfg = TradingConfig(symbols=["BTC/USDT"], strategy="supertrend_adx", timeframe="4h")
+data = {"BTC/USDT": Candles.from_ccxt(rows)}   # rows from exchange.fetch_ohlcv
+result = Backtester(cfg, data).run()
+print(result.summary())
+# return=+12.40%  trades=18  win_rate=55.6%  profit_factor=1.84  max_dd=6.10%  sharpe=1.42
+```
+
+`Backtester.run()` returns a `BacktestResult` with `total_return_pct`,
+`num_trades`, `win_rate`, `profit_factor`, `max_drawdown_pct`, `sharpe` and the
+full `equity_curve` — exactly the metrics an optimization loop needs to rank
+parameter sets.
+
+## "David's approach" — AI-optimized SuperTrend + ADX
+
+The recommended workflow:
+
+1. **Generate / tune** the strategy in TradingView using `strategy.pine`
+   (SuperTrend + ADX, 4h, BTC/ETH/SOL).
+2. **Optimize** parameters (`SUPERTREND_*`, `ADX_THRESHOLD`) by scoring them with
+   `Backtester` over historical candles. This is the function an MCP backtesting
+   server would expose to Claude for an automated optimization loop.
+3. **Export** the winning parameters into `.env`.
+4. **Paper-trade** on the exchange testnet (`DRY_RUN=true`, `TESTNET=true`).
+5. **Go live** with small capital only after validation.
+
+The Python `SupertrendAdxStrategy` mirrors `strategy.pine` so backtest results
+on TradingView and in this bot stay consistent.
 
 ## Test
 
