@@ -73,7 +73,10 @@ class Settings(BaseSettings):
     buildertrend_timeout_seconds: int = 30
     buildertrend_max_retries: int = 3
 
-    # NoblePort ETF Bridge
+    # NoblePort ETF Bridge — WEB3 SECTION
+    # These settings are consumed only by the web3/ workspace.
+    # The construction OS does NOT depend on any of these.
+    # Real-world operations work without RPC URLs, ENS, or chain config.
     nobleport_ens_domain: str = "nobleport.eth"
     nobleport_rpc_url: str = "https://mainnet.infura.io/v3/"
     nobleport_chain_id: int = 1

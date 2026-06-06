@@ -1,5 +1,5 @@
 backend/
-contracts/
+web3/
 gcagent/
 *.py
 *.db

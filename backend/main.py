@@ -18,7 +18,6 @@ from backend.api.schedules import router as schedules_router
 from backend.api.invoices import router as invoices_router
 from backend.api.buildertrend import router as buildertrend_router
 from backend.api.sync import router as sync_router
-from backend.api.bridge import router as bridge_router
 from backend.api.estimates import router as estimates_router
 from backend.api.jobs import router as jobs_router
 from backend.api.payments import router as payments_router
@@ -76,13 +75,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NoblePort OS",
     description=(
-        "AI-operated infrastructure for construction, permitting, estimating, "
-        "compliance, payments, and project execution. Powered by Stephanie.ai "
-        "(intake/routing), GCagent.ai (construction execution), PermitStream.ai "
-        "(permit/compliance), Cyborg.ai (security/governance), and AuditBeacon "
-        "(immutable operational memory)."
+        "Real-world construction operations infrastructure: intake, permitting, "
+        "estimating, payments, jobs, subcontractors, follow-ups, maintenance, "
+        "and workflows. Powered by Stephanie.ai (intake/routing), GCagent.ai "
+        "(construction execution), PermitStream.ai (permit/compliance), "
+        "Cyborg.ai (security/governance), and AuditBeacon (immutable memory). "
+        "Web3/ETF/SSI components live in the separate web3/ workspace."
     ),
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -104,7 +104,6 @@ app.include_router(schedules_router, prefix="/api/schedules", tags=["Schedules"]
 app.include_router(invoices_router, prefix="/api/invoices", tags=["Invoices"])
 app.include_router(buildertrend_router, prefix="/api/buildertrend", tags=["Buildertrend"])
 app.include_router(sync_router, prefix="/api/sync", tags=["Sync"])
-app.include_router(bridge_router, prefix="/api/bridge", tags=["NoblePort Bridge"])
 app.include_router(estimates_router, prefix="/api/estimates", tags=["Estimates"])
 app.include_router(jobs_router, prefix="/api/jobs", tags=["Jobs"])
 app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
