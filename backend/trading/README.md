@@ -42,8 +42,20 @@ broker.py      Candles, Position, MarketData + Broker interfaces,
                PaperBroker (sim) and CCXT{MarketData,Broker} (live)
 bot.py         OctaStackTrader — the engine (step() / run())
 backtest.py    Backtester — replays history through the real engine
+optimize.py    grid_search — score/rank parameter sets (the loop's core)
+data.py        load/save Candles (CSV/JSON) + ccxt history downloader
+mcp_server.py  MCP server exposing run_backtest / optimize / download_ohlcv
 strategy.pine  TradingView Pine Script mirror of the SuperTrend+ADX logic
 __main__.py    CLI wiring (ccxt feed → paper/live broker → engine)
+```
+
+This realises the full "David's approach" pipeline:
+
+```
+Claude ──▶ mcp_server.py ──▶ optimize.py ──▶ backtest.py ──▶ bot.py (engine)
+   ▲                                                              │
+   └──────────────── metrics (Sharpe, win rate, …) ◀─────────────┘
+              tuned params → .env → live execution on Bybit
 ```
 
 Market **data** (read-only prices) is deliberately separated from order
@@ -117,6 +129,54 @@ The recommended workflow:
 
 The Python `SupertrendAdxStrategy` mirrors `strategy.pine` so backtest results
 on TradingView and in this bot stay consistent.
+
+## MCP backtesting server (the optimization loop)
+
+`mcp_server.py` exposes the backtester/optimizer to Claude over MCP so the
+parameter search can be driven by the model:
+
+| Tool             | Purpose                                                    |
+| ---------------- | ---------------------------------------------------------- |
+| `download_ohlcv` | fetch + cache history from an exchange (Bybit, …)          |
+| `run_backtest`   | score one strategy/parameter set → metrics                |
+| `optimize`       | grid-search parameters → ranked metrics                   |
+
+Run it:
+
+```bash
+pip install "mcp[cli]" ccxt
+python -m backend.trading.mcp_server
+```
+
+Register it with Claude Code (`.mcp.json` / `claude mcp add`):
+
+```json
+{
+  "mcpServers": {
+    "octastack-trader": {
+      "command": "python",
+      "args": ["-m", "backend.trading.mcp_server"]
+    }
+  }
+}
+```
+
+Then ask Claude to optimize — it can call `download_ohlcv` for BTC/ETH/SOL 4h,
+then `optimize` over e.g. `{"supertrend_multiplier":[2,3,4],"adx_threshold":[20,25,30]}`,
+and iterate until the metrics look good. The optimizer is also usable directly:
+
+```python
+from backend.trading import TradingConfig
+from backend.trading.data import load_dataset
+from backend.trading.optimize import grid_search
+
+cfg = TradingConfig(symbols=["BTC/USDT"], strategy="supertrend_adx", timeframe="4h")
+data = load_dataset({"BTC/USDT": "data/btc_4h.csv"})
+best = grid_search(cfg, data,
+    {"supertrend_multiplier": [2, 3, 4], "adx_threshold": [20, 25, 30]},
+    sort_key="sharpe", top_n=5)
+print(best[0].as_dict())
+```
 
 ## Test
 

@@ -317,3 +317,122 @@ def test_backtester_runs_and_scores():
     assert 0.0 <= result.win_rate <= 1.0
     assert result.max_drawdown_pct >= 0.0
     assert isinstance(result.summary(), str)
+
+
+# --------------------------------------------------------------------------- #
+# Data I/O
+# --------------------------------------------------------------------------- #
+def _osc_closes(cycles=6):
+    closes = []
+    for _ in range(cycles):
+        closes += [100 - i for i in range(15)] + [85 + i for i in range(15)]
+    return closes
+
+
+def test_csv_round_trip(tmp_path=None):
+    import tempfile, os
+    from backend.trading.data import load_candles_csv, save_candles_csv
+
+    candles = _candles([1, 2, 3, 4, 5])
+    d = tempfile.mkdtemp()
+    path = os.path.join(d, "c.csv")
+    save_candles_csv(path, candles)
+    loaded = load_candles_csv(path)
+    assert loaded.close == candles.close
+    assert loaded.high == candles.high
+    assert len(loaded) == 5
+
+
+def test_csv_missing_columns_raises():
+    import tempfile, os
+    from backend.trading.data import load_candles_csv
+
+    d = tempfile.mkdtemp()
+    path = os.path.join(d, "bad.csv")
+    with open(path, "w") as fh:
+        fh.write("timestamp,close\n1,100\n")
+    try:
+        load_candles_csv(path)
+    except ValueError:
+        return
+    raise AssertionError("expected ValueError for missing columns")
+
+
+# --------------------------------------------------------------------------- #
+# Optimizer
+# --------------------------------------------------------------------------- #
+def test_grid_search_ranks_results():
+    from backend.trading.optimize import grid_search
+
+    cfg = _cfg(
+        symbols=["BTC/USDT"], strategy="ema",
+        rsi_overbought=95.0, rsi_oversold=5.0, starting_paper_balance=10_000.0,
+    )
+    data = {"BTC/USDT": _candles(_osc_closes())}
+    ranked = grid_search(
+        cfg, data,
+        {"fast_ema": [3, 5], "slow_ema": [10, 15]},
+        sort_key="sharpe", min_trades=1,
+    )
+    assert ranked, "expected at least one valid combination"
+    # Sorted descending by sharpe.
+    sharpes = [o.result.sharpe for o in ranked]
+    assert sharpes == sorted(sharpes, reverse=True)
+    assert "fast_ema" in ranked[0].params
+    assert isinstance(ranked[0].as_dict(), dict)
+
+
+def test_grid_search_skips_invalid_combos():
+    from backend.trading.optimize import grid_search
+
+    cfg = _cfg(symbols=["BTC/USDT"], strategy="ema",
+               rsi_overbought=95.0, rsi_oversold=5.0)
+    data = {"BTC/USDT": _candles(_osc_closes())}
+    # fast >= slow is invalid and must be skipped, not raise.
+    ranked = grid_search(
+        cfg, data, {"fast_ema": [5, 20], "slow_ema": [10]},
+        sort_key="total_return_pct", min_trades=0,
+    )
+    for o in ranked:
+        assert o.params["fast_ema"] < o.params["slow_ema"]
+
+
+def test_grid_search_rejects_bad_sort_key():
+    from backend.trading.optimize import grid_search
+
+    cfg = _cfg(symbols=["BTC/USDT"])
+    data = {"BTC/USDT": _candles(_osc_closes())}
+    try:
+        grid_search(cfg, data, {"fast_ema": [3]}, sort_key="nope")
+    except ValueError:
+        return
+    raise AssertionError("expected ValueError for bad sort_key")
+
+
+# --------------------------------------------------------------------------- #
+# MCP tool functions (logic only — no mcp package / network needed)
+# --------------------------------------------------------------------------- #
+def test_mcp_run_backtest_and_optimize(tmp_path=None):
+    import tempfile, os
+    from backend.trading.data import save_candles_csv
+    from backend.trading.mcp_server import optimize as mcp_optimize
+    from backend.trading.mcp_server import run_backtest as mcp_run_backtest
+
+    d = tempfile.mkdtemp()
+    path = os.path.join(d, "btc.csv")
+    save_candles_csv(path, _candles(_osc_closes()))
+    data_paths = {"BTC/USDT": path}
+
+    bt = mcp_run_backtest(
+        data_paths, strategy="ema", timeframe="4h",
+        params={"fast_ema": 5, "slow_ema": 12,
+                "rsi_overbought": 95.0, "rsi_oversold": 5.0},
+    )
+    assert "total_return_pct" in bt and "sharpe" in bt
+    assert bt["num_trades"] >= 0
+
+    ranked = mcp_optimize(
+        data_paths, {"fast_ema": [3, 5], "slow_ema": [10, 15]},
+        strategy="ema", sort_key="sharpe", top_n=3,
+    )
+    assert isinstance(ranked, list) and len(ranked) <= 3
