@@ -18,6 +18,7 @@ const PRIMARY: NavItem[] = [
   { href: '/dashboard/voice', label: 'Voice', hint: 'Stephanie console' },
   { href: '/dashboard/compliance', label: 'Compliance', hint: 'Cyborg · kill switches' },
   { href: '/dashboard/audit', label: 'Audit', hint: 'Hash-linked chain' },
+  { href: '/dashboard/terminal', label: 'Terminal', hint: 'KUZO · chain ops' },
 ];
 
 const SECONDARY: NavItem[] = [

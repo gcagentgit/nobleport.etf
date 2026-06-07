@@ -94,6 +94,16 @@ class Settings(BaseSettings):
     avatar_max_output_tokens: int = 800
     audit_log_path: str = "./nobleport_audit.jsonl"
 
+    # Treasury / chain terminal (read-only Arbitrum data; the BROWSER fetches the
+    # RPC directly — public endpoint, no key — so it works regardless of backend
+    # network policy. The backend only echoes config + serves the local snapshot.)
+    arbitrum_rpc_url: str = "https://arb1.arbitrum.io/rpc"
+    arbitrum_chain_id: int = 42161
+    treasury_wallet_address: Optional[str] = None  # unset → balances show "unconfigured"
+    arbitrum_usdc_address: str = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"  # native USDC, 6dp
+    nbpt_token_address: Optional[str] = None
+    nbpt_token_decimals: int = 18
+
     # CORS
     cors_origins: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:8400"]

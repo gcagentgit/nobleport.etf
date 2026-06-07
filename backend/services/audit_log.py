@@ -59,6 +59,10 @@ class AuditLog:
                     last_line = line
         return json.loads(last_line) if last_line else None
 
+    def head(self) -> dict[str, Any] | None:
+        """Return the most recent record (seq, ts, event, hash, ...) or None."""
+        return self._last_record()
+
     def append(self, event: str, data: dict[str, Any]) -> dict[str, Any]:
         """Append an event and return the written record."""
         with self._lock:

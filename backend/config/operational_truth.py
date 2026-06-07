@@ -68,6 +68,12 @@ OPERATIONAL_TRUTH: dict[str, dict[str, Any]] = {
         "description": "Model emits validated avatar control packets; actions gated by command freeze",
         "dependencies": ["openai", "fastapi"],
     },
+    "treasury_terminal": {
+        "status": DeploymentStatus.STAGED,
+        "surface": "Frontend",
+        "description": "Chain ops terminal: live Arbitrum data (client-fetched) + local SHA-256 snapshot",
+        "dependencies": ["nextjs", "arbitrum-rpc"],
+    },
     "treasury_workflows": {
         "status": DeploymentStatus.STAGED,
         "surface": "Backend",
