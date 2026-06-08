@@ -1,5 +1,6 @@
 import { Topbar } from '@/components/dashboard/Topbar';
 import { Panel } from '@/components/dashboard/Panel';
+import { RoofingTabs } from '@/components/dashboard/RoofingTabs';
 import { fallProtectionProgram as fp } from '@/lib/roofing/fall-protection';
 import type { GateStatus } from '@/lib/roofing/fall-protection';
 
@@ -24,6 +25,7 @@ export default function RoofingFallProtectionPage() {
   return (
     <>
       <Topbar pageTitle="NoblePort Roofing · Fall Protection" />
+      <RoofingTabs />
       <main className="flex-1 space-y-4 px-4 py-4 sm:px-6 sm:py-6">
         {/* Header block */}
         <section className="panel panel-pad">
