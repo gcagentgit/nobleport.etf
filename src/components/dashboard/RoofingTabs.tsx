@@ -13,7 +13,8 @@ export function RoofingTabs() {
   return (
     <nav className="flex gap-1 border-b border-ink-700 px-4 pt-2 sm:px-6">
       {TABS.map((t) => {
-        const active = pathname === t.href;
+        const active =
+          t.href === '/dashboard/roofing' ? pathname === t.href : pathname.startsWith(t.href);
         return (
           <Link
             key={t.href}

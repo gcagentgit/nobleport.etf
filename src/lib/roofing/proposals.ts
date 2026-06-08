@@ -48,6 +48,7 @@ export interface RoofingProposal {
   preparedBy: string;
   company: string;
   projectAddress: string;
+  summary?: string;
 
   // Overview / measurements
   totalAreaSf: number;
@@ -205,4 +206,136 @@ function buildProposal(): RoofingProposal {
 
 export const proposal20_61st: RoofingProposal = buildProposal();
 
-export const roofingProposals: RoofingProposal[] = [proposal20_61st];
+/**
+ * 3 Otis Place — partial "half-roof" re-roof of one lower slope, priced per
+ * square ($950/square = $9.50/SF) per owner scope. Measurements from the Roofr
+ * report (Nearmap imagery Mar 31, 2023): full roof 1,979 SF / 1,895 SF pitched /
+ * 22 facets / predominant pitch 10/12. The two main 10/12 lower slopes measure
+ * 707 + 717 SF (≈ the 1,422 SF predominant-pitch area); this proposal covers
+ * one of them.
+ */
+function buildOtisProposal(): RoofingProposal {
+  const slopeAreaSf = 717; // one lower slope (the larger of the two main 10/12 facets)
+  const squares = Math.round((slopeAreaSf / 100) * 100) / 100; // 7.17 squares
+  const pricePerSquare = 950; // owner-quoted: $950 / square (100 SF) = $9.50/SF
+  const roofingAmount = round(slopeAreaSf * (pricePerSquare / 100)); // 6,812
+  const chimneyAllowance = 650; // re-flash; masonry/crown excluded
+  const skylightAllowance = 350; // re-flash existing skylight in place
+
+  const lineItems: LineItem[] = [
+    {
+      description: 'Partial Re-Roof — One Lower Slope',
+      detail:
+        'Tear-off, ice & water shield, synthetic underlayment, architectural shingles & drip edge (disposal of removed slope included)',
+      qty: squares,
+      unit: 'SQ',
+      rate: pricePerSquare,
+      amount: roofingAmount,
+    },
+    {
+      description: 'Chimney Work',
+      detail: 'Re-flash chimney — step & counter-flashing (masonry rebuild / crown excluded)',
+      qty: 1,
+      unit: 'LS',
+      rate: chimneyAllowance,
+      amount: chimneyAllowance,
+    },
+    {
+      description: 'Skylight Re-Flash',
+      detail: 'Re-flash existing skylight in place (glazing / unit replacement excluded)',
+      qty: 1,
+      unit: 'LS',
+      rate: skylightAllowance,
+      amount: skylightAllowance,
+    },
+  ];
+
+  const subtotal = roofingAmount + chimneyAllowance + skylightAllowance; // 7,812
+  const contingencyPct = 0.1;
+  const contingencyAmount = round(subtotal * contingencyPct);
+  const total = subtotal;
+  const investmentLow = round(subtotal / 50) * 50;
+  const investmentHigh = round((subtotal + contingencyAmount) / 50) * 50;
+
+  const paymentSchedule: PaymentMilestone[] = [
+    { milestone: 'Deposit', pct: 0.3, amount: round(total * 0.3), gate: 'Required to schedule — no deposit, no schedule' },
+    { milestone: 'Dry-in', pct: 0.4, amount: round(total * 0.4), gate: 'Tear-off + ice & water / underlayment complete on the slope' },
+    { milestone: 'Completion', pct: 0.3, amount: total - round(total * 0.3) - round(total * 0.4), gate: 'Skylight & chimney flashing done · final inspection' },
+  ];
+
+  return {
+    id: '3-otis-place-newburyport',
+    proposalNo: 'NP-RF-2026-0043',
+    status: 'draft',
+    date: 'June 8, 2026',
+    preparedBy: 'NoblePort Construction LLC — Estimating',
+    company: 'NoblePort Construction LLC',
+    projectAddress: '3 Otis Place, Newburyport, MA 01950',
+    summary:
+      'Partial "half-roof" re-roof of one lower slope (~717 SF / 7.17 squares) at $950/square — tear-off, ice & water shield, synthetic underlayment, architectural shingles and drip edge, plus skylight re-flash and chimney flashing. One side only, per owner scope.',
+
+    totalAreaSf: slopeAreaSf,
+    pitchedAreaSf: slopeAreaSf,
+    flatAreaSf: 0,
+    pitch: '10/12',
+    squares,
+
+    scope: [
+      { task: 'Remove (tear off) existing roofing — one lower slope', included: true },
+      { task: 'Install ice & water shield', included: true },
+      { task: 'Install synthetic underlayment', included: true },
+      { task: 'Install architectural shingles', included: true },
+      { task: 'Install drip edge', included: true },
+      { task: 'Re-flash existing skylight', included: true },
+      { task: 'Chimney flashing / counter-flashing', included: true },
+      { task: 'Site cleanup & disposal', included: true },
+    ],
+
+    materials: [
+      { component: 'Eaves / penetration underlayment', product: 'Self-adhering ice & water shield' },
+      { component: 'Field underlayment', product: 'Synthetic underlayment (full coverage)' },
+      { component: 'Roofing', product: 'Architectural (dimensional) asphalt shingles' },
+      { component: 'Edge', product: '10" aluminum drip edge (eaves + rakes)' },
+      { component: 'Chimney', product: 'Aluminum step + counter-flashing' },
+      { component: 'Skylight', product: 'Manufacturer step-flashing / re-flash kit' },
+    ],
+
+    lineItems,
+    subtotal,
+    contingencyPct,
+    contingencyAmount,
+    total,
+    investmentLow,
+    investmentHigh,
+
+    durationDays: '1–2 days (weather permitting)',
+    paymentSchedule,
+
+    fallProtectionNote:
+      'At a 10/12 (steep-slope) pitch this slope requires personal fall arrest (PFAS) and likely roof brackets/jacks under the NoblePort Fall Protection Program. Anchorage, harness inspection, and supervisor approval gates must clear before WORK_AUTHORIZED is emitted for this job.',
+
+    assumptions: [
+      'Full roof per Roofr report (Nearmap Mar 31, 2023): 1,979 SF total, 1,895 SF pitched, 22 facets, predominant pitch 10/12. This proposal covers ONE lower slope only (~717 SF / 7.17 squares).',
+      '$950 per square is an installed price covering tear-off, ice & water shield, synthetic underlayment, architectural shingles and drip edge; disposal of the removed slope is included.',
+      'Chimney work is a flashing / counter-flashing allowance; masonry rebuild, crown or cap repair is excluded unless separately quoted.',
+      'Skylight is re-flashed in place; skylight glazing or unit replacement is excluded.',
+      'Includes a 10% concealed-deck-repair contingency; sheathing replacement beyond the allowance is billed at unit rate.',
+      'Figures are an estimate pending on-site deck inspection; not a firm bid until signed.',
+    ],
+    exclusions: [
+      'Opposite slope, upper roof sections, and flat/low-slope areas (not in this scope).',
+      'Chimney masonry, crown, or cap work.',
+      'Skylight glazing or unit replacement.',
+      'Building permit fees (owner-provided or billed at cost).',
+      'Structural framing / rafter / decking replacement beyond the contingency allowance.',
+    ],
+  };
+}
+
+export const proposal3Otis: RoofingProposal = buildOtisProposal();
+
+export const roofingProposals: RoofingProposal[] = [proposal20_61st, proposal3Otis];
+
+export function getProposalById(id: string): RoofingProposal | undefined {
+  return roofingProposals.find((p) => p.id === id);
+}
