@@ -33,6 +33,7 @@ from backend.api.revenue import router as revenue_router
 from backend.api.dashboard import router as dashboard_router
 from backend.api.trust import router as trust_router
 from backend.api.ops_brief import router as ops_brief_router
+from backend.api.governance import router as governance_router
 from backend.config.database import init_db
 from backend.config.settings import settings
 from backend.services.sync_engine import SyncEngine
@@ -109,6 +110,7 @@ app.include_router(revenue_router, prefix="/api/revenue", tags=["Revenue Engine"
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["Mission Control"])
 app.include_router(trust_router, prefix="/api/trust", tags=["Proof of Trust"])
 app.include_router(ops_brief_router, prefix="/api/ops-brief", tags=["Stephanie Ops Brief"])
+app.include_router(governance_router, prefix="/api/governance", tags=["Stephanie Governance"])
 
 
 if __name__ == "__main__":
