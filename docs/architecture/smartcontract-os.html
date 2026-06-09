@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoblePort | Smart Contract OS Architecture</title>
+    <meta name="description" content="Interactive truth-layered map of the NoblePort smart-contract operating system.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --blueprint-cream: #FDFBF7;
+            --blueprint-slate: #334155;
+            --blueprint-amber: #D97706;
+            --blueprint-emerald: #059669;
+            --blueprint-blue: #2563EB;
+            --blueprint-rose: #E11D48;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--blueprint-cream); color: var(--blueprint-slate); }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .chart-container { position: relative; width: 100%; max-width: 700px; margin: 0 auto; height: 350px; max-height: 400px; }
+
+        .os-layer-card { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); border: 1px solid rgba(51,65,85,0.1); }
+        .os-layer-card:hover, .os-layer-card:focus-visible { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05), 0 10px 10px -5px rgba(0,0,0,0.02); border-color: var(--blueprint-blue); outline: none; }
+        .os-layer-card:focus-visible { box-shadow: 0 0 0 3px rgba(37,99,235,0.35); }
+
+        .status-pill, .ev-pill { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; white-space: nowrap; display: inline-block; }
+
+        /* Operational state */
+        .status-live { background-color: #D1FAE5; color: #065F46; }
+        .status-staged { background-color: #DBEAFE; color: #1E40AF; }
+        .status-simulated { background-color: #FEF3C7; color: #92400E; }
+        .status-blocked { background-color: #FFE4E6; color: #9F1239; }
+        .status-target { background-color: #F1F5F9; color: #475569; }
+
+        /* Evidence / credibility axis */
+        .ev-verified   { background:#DCFCE7; color:#166534; }
+        .ev-mgmt_est   { background:#F5F3FF; color:#6D28D9; }
+        .ev-simulated  { background:#FEF3C7; color:#92400E; }
+        .ev-blocked    { background:#FFE4E6; color:#9F1239; }
+        .ev-human_gated{ background:#E0E7FF; color:#3730A3; }
+
+        .filter-chip { transition: all .15s ease; cursor: pointer; }
+        .filter-chip[aria-pressed="true"] { background: var(--blueprint-slate); color: #fff; border-color: var(--blueprint-slate); }
+
+        .details-pane { animation: slideIn 0.4s ease-out; }
+        @keyframes slideIn { from { opacity:0; transform: translateX(20px);} to { opacity:1; transform: none;} }
+
+        /* Print / export mode */
+        @media print {
+            .no-print { display: none !important; }
+            body { background: #fff; }
+            .print-block { break-inside: avoid; }
+            #detailsView { display: block !important; }
+            .os-layer-card { box-shadow: none; transform: none; }
+            a[href]:after { content: ""; }
+        }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden">
+
+<!--
+  Chosen Palette: 'Architectural Neutral' — cream document background, slate text.
+  Accent colors are reserved for status + evidence indicators only (institutional credibility).
+  v4.0 upgrade: dual-axis truth layer (state + evidence), risk register, print/export mode,
+  filters, summary stats, compliance disclaimer, a11y, deep-linking. NO SVG / NO Mermaid.
+-->
+
+<div class="max-w-7xl mx-auto px-4 py-12 md:px-8">
+
+    <!-- Header & Legend -->
+    <header class="mb-12">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-slate-200 pb-8">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="w-8 h-8 bg-slate-900 text-white flex items-center justify-center font-bold rounded">NP</span>
+                    <h1 class="text-3xl font-bold tracking-tight text-slate-900 uppercase">NoblePort OS</h1>
+                </div>
+                <p class="text-slate-500 max-w-xl">A layered smart-contract operating system for construction, compliance, and immutable project governance.</p>
+            </div>
+            <div class="no-print flex flex-col gap-3 items-stretch md:items-end">
+                <div class="flex flex-wrap gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                    <div class="flex items-center gap-2"><span class="status-pill status-live">LIVE</span><span class="text-[10px] text-slate-400 font-bold">OPERATIONAL</span></div>
+                    <div class="flex items-center gap-2"><span class="status-pill status-staged">STAGED</span><span class="text-[10px] text-slate-400 font-bold">BUILT/NON-PROD</span></div>
+                    <div class="flex items-center gap-2"><span class="status-pill status-simulated">SIMULATED</span><span class="text-[10px] text-slate-400 font-bold">MODELING/TEST</span></div>
+                    <div class="flex items-center gap-2"><span class="status-pill status-blocked">BLOCKED</span><span class="text-[10px] text-slate-400 font-bold">UPSTREAM DEP</span></div>
+                    <div class="flex items-center gap-2"><span class="status-pill status-target">TARGET</span><span class="text-[10px] text-slate-400 font-bold">ROADMAP</span></div>
+                </div>
+                <div class="flex flex-wrap gap-3 bg-white p-3 rounded-xl shadow-sm border border-slate-100 text-[10px] text-slate-400 font-bold items-center">
+                    <span class="text-slate-500 uppercase tracking-widest">Evidence:</span>
+                    <span class="ev-pill ev-verified">Verified</span>
+                    <span class="ev-pill ev-mgmt_est">Mgmt Est</span>
+                    <span class="ev-pill ev-simulated">Simulated</span>
+                    <span class="ev-pill ev-human_gated">Human-Gated</span>
+                    <button id="printBtn" class="ml-auto px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[11px] tracking-wide hover:bg-slate-700 transition">⎙ Export / Print</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Summary Stats -->
+    <section class="mb-12">
+        <div id="statBar" class="grid grid-cols-2 md:grid-cols-5 gap-4"></div>
+    </section>
+
+    <!-- Maturity Dashboard -->
+    <section class="mb-16">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
+            <div class="lg:col-span-1">
+                <h2 class="text-2xl font-bold mb-4">Architectural Maturity</h2>
+                <p class="text-slate-600 mb-6 leading-relaxed">
+                    This radar map visualizes the operational readiness of the NoblePort OS. The durable moats — <strong>Audit Infrastructure</strong> and <strong>KUZO fail-closed staging</strong> — are where real execution discipline meets on-chain verification. Lowest-maturity layers carry the highest legal/jurisdictional risk.
+                </p>
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100"><span class="text-blue-600 font-bold mono">95%</span><span class="text-sm text-slate-500">KUZO Safe Swap — staging maturity (execution disabled by policy)</span></div>
+                    <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100"><span class="text-amber-600 font-bold mono">40%</span><span class="text-sm text-slate-500">Jurisdictional permit accuracy — current blocker</span></div>
+                </div>
+            </div>
+            <div class="lg:col-span-2">
+                <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                    <div class="chart-container"><canvas id="maturityChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Filters + Layer Grid -->
+    <section class="mb-16">
+        <div class="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+                <h2 class="text-2xl font-bold mb-2">Smart Contract Layers</h2>
+                <p class="text-slate-500 italic">Select a layer to explore functions, owners, and strategic reality checks.</p>
+            </div>
+            <div class="no-print flex flex-wrap items-center gap-2" id="filterBar">
+                <span class="text-[11px] uppercase tracking-widest text-slate-400 font-bold mr-1">Filter</span>
+                <button class="filter-chip border border-slate-200 rounded-full px-3 py-1 text-xs font-semibold" data-filter="ALL" aria-pressed="true">All</button>
+                <button class="filter-chip border border-slate-200 rounded-full px-3 py-1 text-xs font-semibold" data-filter="LIVE" aria-pressed="false">Live</button>
+                <button class="filter-chip border border-slate-200 rounded-full px-3 py-1 text-xs font-semibold" data-filter="STAGED" aria-pressed="false">Staged</button>
+                <button class="filter-chip border border-slate-200 rounded-full px-3 py-1 text-xs font-semibold" data-filter="SIMULATED" aria-pressed="false">Simulated</button>
+                <button class="filter-chip border border-slate-200 rounded-full px-3 py-1 text-xs font-semibold" data-filter="TARGET" aria-pressed="false">Target</button>
+                <select id="sortSelect" class="ml-2 border border-slate-200 rounded-full px-3 py-1 text-xs font-semibold bg-white text-slate-600">
+                    <option value="layer">Sort: Layer</option>
+                    <option value="maturity-desc">Sort: Maturity ↓</option>
+                    <option value="maturity-asc">Sort: Maturity ↑</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="layerGrid"></div>
+    </section>
+
+    <!-- Detailed Explorer Pane -->
+    <section id="detailsView" class="hidden mb-16 scroll-mt-24">
+        <div class="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden details-pane">
+            <div class="p-8 md:p-12">
+                <div class="flex flex-col md:flex-row justify-between items-start gap-6 mb-8">
+                    <div>
+                        <div id="detailStatus" class="mb-4 flex flex-wrap gap-2"></div>
+                        <h3 id="detailName" class="text-3xl font-bold text-slate-900 mb-2">Layer Name</h3>
+                        <p id="detailDesc" class="text-lg text-slate-500 max-w-2xl"></p>
+                        <div class="mt-5 flex flex-wrap gap-6 text-sm">
+                            <div><span class="block text-[10px] uppercase tracking-widest text-slate-400 font-bold">Owner</span><span id="detailOwner" class="font-semibold text-slate-700"></span></div>
+                            <div><span class="block text-[10px] uppercase tracking-widest text-slate-400 font-bold">Next gate / horizon</span><span id="detailHorizon" class="font-semibold text-slate-700"></span></div>
+                            <div><span class="block text-[10px] uppercase tracking-widest text-slate-400 font-bold">Maturity</span><span id="detailMaturity" class="font-semibold text-slate-700 mono"></span></div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 w-full md:w-80">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Contracts</h4>
+                        <div id="detailContracts" class="space-y-2 text-sm font-medium text-slate-700 mono italic"></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 border-t border-slate-100 pt-10">
+                    <div>
+                        <h4 class="font-bold text-slate-900 mb-4 flex items-center gap-2"><span class="text-blue-600">◆</span> Key Functions</h4>
+                        <ul id="detailFunctions" class="space-y-3 text-slate-600 text-sm"></ul>
+                        <h4 class="font-bold text-slate-900 mt-8 mb-3 flex items-center gap-2"><span class="text-rose-600">▣</span> Next Action</h4>
+                        <p id="detailAction" class="text-sm text-slate-600"></p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-900 mb-4 flex items-center gap-2 text-amber-600"><span>⚠</span> Strategic Reality Check</h4>
+                        <div id="detailReality" class="p-6 bg-amber-50 rounded-2xl border border-amber-100 text-sm text-amber-900 leading-relaxed italic"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Risk Register (export-grade) -->
+    <section class="mb-16 print-block">
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold mb-2">Risk Register</h2>
+            <p class="text-slate-500 italic">Layer-level risks, owners, and next actions — the export view investors and counsel will read.</p>
+        </div>
+        <div class="overflow-x-auto bg-white rounded-2xl border border-slate-200 shadow-sm">
+            <table class="w-full text-sm text-left">
+                <thead class="text-[11px] uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                    <tr>
+                        <th class="px-4 py-3">Layer</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Evidence</th>
+                        <th class="px-4 py-3">Primary Risk</th>
+                        <th class="px-4 py-3">Owner</th>
+                        <th class="px-4 py-3">Next Action</th>
+                        <th class="px-4 py-3">Horizon</th>
+                    </tr>
+                </thead>
+                <tbody id="riskRegister" class="divide-y divide-slate-50"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Strategic Moat Summary -->
+    <section class="mb-12">
+        <div class="bg-slate-900 text-white p-12 rounded-[3rem] relative overflow-hidden">
+            <div class="relative z-10">
+                <h2 class="text-3xl font-bold mb-8">The NoblePort Enterprise Moat</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div class="space-y-2"><h4 class="text-amber-400 font-bold uppercase text-xs tracking-widest">Workflow</h4><p class="text-sm opacity-80 leading-relaxed">Construction workflow automation and licensed GC alignment.</p></div>
+                    <div class="space-y-2"><h4 class="text-amber-400 font-bold uppercase text-xs tracking-widest">Intelligence</h4><p class="text-sm opacity-80 leading-relaxed">Permit and zoning intelligence bridging municipalities and chain verification.</p></div>
+                    <div class="space-y-2"><h4 class="text-amber-400 font-bold uppercase text-xs tracking-widest">Execution</h4><p class="text-sm opacity-80 leading-relaxed">Escrow, payment orchestration, and immutable project records.</p></div>
+                    <div class="space-y-2"><h4 class="text-amber-400 font-bold uppercase text-xs tracking-widest">Identity</h4><p class="text-sm opacity-80 leading-relaxed">Audit infrastructure foundational for institutional onboarding.</p></div>
+                </div>
+                <div class="mt-12 pt-8 border-t border-white/10 text-center">
+                    <p class="text-sm font-medium opacity-50 uppercase tracking-[0.2em]">The token layer only matters if the operational layer works first.</p>
+                </div>
+            </div>
+            <div class="absolute -bottom-24 -right-24 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl"></div>
+        </div>
+    </section>
+
+    <!-- Compliance Disclaimer -->
+    <section class="mb-8 print-block">
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 text-xs leading-relaxed text-slate-500">
+            <h4 class="font-bold text-slate-700 uppercase tracking-widest text-[11px] mb-2">Compliance &amp; Truth-Layer Notice</h4>
+            <p class="mb-2">NoblePort Systems is <strong>not</strong> a licensed broker-dealer, investment adviser, or financial institution. The NBPT and KUZO tokens are <strong>not registered</strong> under securities law and no verified public sale has occurred. References to “ETF”, “Yield”, “Bond”, or “staking” describe <strong>architectural intent</strong> and are illustrative — they are not offers, solicitations, or operational metrics.</p>
+            <p class="mb-2">Status reflects <strong>management estimates</strong> unless explicitly marked <span class="ev-pill ev-verified">Verified</span>. <span class="ev-pill ev-human_gated">Human-Gated</span> layers cannot execute without authorized (Michael / licensed) approval. Maturity percentages are point-in-time management estimates, not audited figures. Overall platform completion is tracked at <strong>46%</strong> (pre-Series A / strategic seed narrative; platform ARR $0).</p>
+        </div>
+    </section>
+
+    <footer class="text-center text-slate-400 text-xs py-8">
+        <p>&copy; 2026 NoblePort Systems · Institutional Architecture Blueprint v4.0 · <span id="asOf" class="mono"></span></p>
+    </footer>
+</div>
+
+<script>
+    // --- Data: 10 OS layers, now dual-axis (state + evidence) with owner / action / horizon / risk ---
+    const layers = [
+        { id:1, name:"Construction Governance", status:"STAGED", evidence:"MGMT_EST",
+          desc:"The primary operational moat: licensed GC operations and liability mapping.",
+          contracts:["NPCAgreement.sol"],
+          functions:["AIA/HIC-aligned workflow governance","Milestone enforcement","Payment coordination","Work-order tracking","Dispute handling"],
+          reality:"Potentially the strongest long-term moat because it maps to licensed GC operations and real payment disputes. Enterprise value here outweighs speculative token mechanics.",
+          risk:"Liability mapping to real GC obligations must hold up under dispute.",
+          owner:"GCagent.ai", action:"Wire milestone enforcement to live job records; reconcile against deposit gate.", horizon:"Phase 2", maturity:85 },
+        { id:2, name:"Permit + Zoning", status:"SIMULATED", evidence:"SIMULATED",
+          desc:"Bridges municipalities and chain verification through jurisdictional intelligence.",
+          contracts:["PermitStream.ai","ZoningCourt.sol","ZoneMintSEA.sol"],
+          functions:["Zoning validation","Permit gating","Jurisdictional rules","DAO-linked permit workflows","Arbitration / oracle enforcement"],
+          reality:"Jurisdictional accuracy is the hardest problem. Overlay conflicts and municipal edge cases require manual intervention — normal for permit intelligence.",
+          risk:"Jurisdictional accuracy ~40%; municipal connectors incomplete (current blocker).",
+          owner:"PermitStream.ai", action:"Build MA/NH/ME/CT connectors; keep manual fallback packet for filing.", horizon:"30–60d", maturity:40 },
+        { id:3, name:"Identity + Compliance", status:"STAGED", evidence:"MGMT_EST",
+          desc:"Non-transferable credentials for accountability and human oversight.",
+          contracts:["SBTFactory.sol","zk-SBT Framework","SnapshotSyncModule"],
+          functions:["Contractor identity binding","Investor gating","Permit authority","DAO permissions","Compliance verification"],
+          reality:"Identity binding is not just a feature; it's a foundational requirement for institutional trust as AI governance moves toward accountability.",
+          risk:"HSM signing not live; identity/signing architecture incomplete.",
+          owner:"Cyborg.ai", action:"Stand up HSM signing; bind contractor SBTs to verified credentials.", horizon:"Phase 3", maturity:75 },
+        { id:4, name:"Treasury + Settlement", status:"SIMULATED", evidence:"HUMAN_GATED",
+          desc:"Routing and settlement between traditional banking and digital assets.",
+          contracts:["TreasuryBotV3.sol","FiatRouter.sol","BondStreamLinker.sol","NPETF.sol"],
+          functions:["Treasury routing","Fiat settlement (Stripe / Mercury)","Yield allocation (illustrative; subject to securities review)","Bond streaming (illustrative)","ETF-style exposure (illustrative; not a registered fund)"],
+          reality:"Highest regulatory-risk area. Requires transfer-agent strategy and securities counsel. 'ETF' and 'Yield' language requires strict legal review before production.",
+          risk:"Securities exposure; 'ETF'/'Yield' terms need counsel before any production use.",
+          owner:"Michael + securities counsel", action:"Engage transfer-agent strategy + securities counsel before enabling any settlement path.", horizon:"Post-legal", maturity:50 },
+        { id:5, name:"Token Layer", status:"TARGET", evidence:"HUMAN_GATED",
+          desc:"Governance and utility layer restricted by institutional-grade compliance controls.",
+          contracts:["NBPT","ERC-1400 Infrastructure"],
+          functions:["Contractor bonding","Permit fee settlement","Staking & premium access","Transfer restrictions","Partition enforcement"],
+          reality:"Token is not launched. Projections are not operational metrics. No verified public sale has occurred — this language is materially safer and more credible.",
+          risk:"Unlaunched; any sale/claim without audit + legal gate is non-compliant.",
+          owner:"Michael + legal", action:"Hold behind audit + legal gate; never frame projections as traction.", horizon:"Pending audit/legal", maturity:20 },
+        { id:6, name:"Governance Layer", status:"STAGED", evidence:"MGMT_EST",
+          desc:"Hybrid coordination: off-chain discussion with on-chain verification.",
+          contracts:["Snapshot","Aragon OSx"],
+          functions:["Discussion → proposal flow","Weighted voting","IPFS anchoring","DAO execution modules","Audit log generation"],
+          reality:"Pure on-chain governance rarely works operationally. Best model combines off-chain coordination with immutable on-chain audit trails.",
+          risk:"Execution modules unproven under real treasury control.",
+          owner:"Cyborg.ai / DAO", action:"Anchor decision history to IPFS; keep execution human-gated.", horizon:"Phase 3", maturity:80 },
+        { id:7, name:"Audit + Oracle", status:"STAGED", evidence:"MGMT_EST",
+          desc:"Notarization and proof anchoring ensuring event integrity across the OS.",
+          contracts:["AuditBeacon.sol","Chainlink Integrations"],
+          functions:["Notarization","Proof anchoring","Event verification","Immutable audit integrity","Oracle verification systems"],
+          reality:"Foundational for municipal trust and institutional onboarding. The bedrock of compliance and operational accountability.",
+          risk:"Anchor tx volume must be exportable for benchmark proof.",
+          owner:"AuditBeacon", action:"Export Arbiscan anchor tx count; wire hash-chain to backend events.", horizon:"This week", maturity:90 },
+        { id:8, name:"Real Estate Layer", status:"SIMULATED", evidence:"HUMAN_GATED",
+          desc:"Digital representation of deeds and ownership within fractional frameworks.",
+          contracts:["RealEstateNFT.sol","RealEstateClosing.sol"],
+          functions:["Deed representation","Title linkage","Commission enforcement","Rent streaming","Ownership records"],
+          reality:"The technology is easier than the legal framework. Title recognition and transfer law across state lines remain unresolved — proceed cautiously.",
+          risk:"Title/transfer law unresolved across jurisdictions.",
+          owner:"Michael + real estate counsel", action:"Limit to record-keeping until title-recognition counsel clears transfer.", horizon:"Post-legal", maturity:30 },
+        { id:9, name:"KUZO Safe Swap", status:"STAGED", evidence:"MGMT_EST",
+          desc:"Disciplined swap layer with strict safety controls and fail-closed design.",
+          contracts:["SwapExecutor (staged)"],
+          functions:["Daily notional caps","Slippage protection","Kill-switch enforcement","Allowlist gating","Immutable audit logs"],
+          reality:"The most disciplined section. Execution is intentionally disabled (HTTP 403 by policy) — the correct fail-closed staging architecture.",
+          risk:"Execution disabled by policy; do NOT enable without all gates passing.",
+          owner:"KUZO policy / Cyborg.ai", action:"Keep execution fail-closed; clear chain/token allowlist + slippage gates first.", horizon:"Gated", maturity:95 },
+        { id:10, name:"Project Certification", status:"TARGET", evidence:"MGMT_EST",
+          desc:"Immutable closeout packages for owners: permits and milestone verification.",
+          contracts:["NoblePortProjectCertificate.sol"],
+          functions:["Completion certificates","Milestone verification","Permit closeout proof","Contractor achievement records","Immutable owner archives"],
+          reality:"Commercially viable for warranty chains and resale-trust systems if kept operationally simple. Could become construction closeout infrastructure.",
+          risk:"Scope creep — must stay operationally simple to be viable.",
+          owner:"GCagent.ai", action:"Define minimal closeout cert schema tied to milestone + permit proofs.", horizon:"Deferred", maturity:15 },
+    ];
+
+    const STATE_LABEL = { LIVE:"LIVE", STAGED:"STAGED", SIMULATED:"SIMULATED", BLOCKED:"BLOCKED", TARGET:"TARGET" };
+    const EV_LABEL = { VERIFIED:"Verified", MGMT_EST:"Mgmt Est", SIMULATED:"Simulated", BLOCKED:"Blocked", HUMAN_GATED:"Human-Gated" };
+
+    let activeLayerId = null;
+    let activeFilter = "ALL";
+    let activeSort = "layer";
+    let chart = null;
+
+    const pad2 = n => String(n).padStart(2, "0");
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+    function visibleLayers() {
+        let out = layers.filter(l => activeFilter === "ALL" || l.status === activeFilter);
+        if (activeSort === "maturity-desc") out = [...out].sort((a,b)=>b.maturity-a.maturity);
+        else if (activeSort === "maturity-asc") out = [...out].sort((a,b)=>a.maturity-b.maturity);
+        else out = [...out].sort((a,b)=>a.id-b.id);
+        return out;
+    }
+
+    function renderStats() {
+        const avg = Math.round(layers.reduce((s,l)=>s+l.maturity,0)/layers.length);
+        const count = s => layers.filter(l=>l.status===s).length;
+        const stats = [
+            { label:"OS Layers", val: layers.length, color:"text-slate-900" },
+            { label:"Avg Maturity", val: avg + "%", color:"text-blue-600" },
+            { label:"Live", val: count("LIVE"), color:"text-emerald-600" },
+            { label:"Staged", val: count("STAGED"), color:"text-blue-600" },
+            { label:"Human-Gated", val: layers.filter(l=>l.evidence==="HUMAN_GATED").length, color:"text-indigo-600" },
+        ];
+        document.getElementById("statBar").innerHTML = stats.map(s => `
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-center">
+                <div class="text-3xl font-bold mono ${s.color} leading-none">${s.val}</div>
+                <div class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mt-2">${s.label}</div>
+            </div>`).join("");
+    }
+
+    function renderLayerGrid() {
+        const grid = document.getElementById("layerGrid");
+        const list = visibleLayers();
+        grid.innerHTML = list.map(layer => {
+            const sc = `status-${layer.status.toLowerCase()}`;
+            const ec = `ev-${layer.evidence.toLowerCase()}`;
+            const active = activeLayerId === layer.id ? "ring-2 ring-blue-500" : "";
+            return `
+            <div class="os-layer-card bg-white p-6 rounded-2xl cursor-pointer shadow-sm relative overflow-hidden ${active}"
+                 role="button" tabindex="0" aria-pressed="${activeLayerId===layer.id}" data-id="${layer.id}">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="status-pill ${sc}">${STATE_LABEL[layer.status]}</span>
+                        <span class="ev-pill ${ec}">${EV_LABEL[layer.evidence]}</span>
+                    </div>
+                    <span class="text-[10px] mono text-slate-300">LAYER ${pad2(layer.id)}</span>
+                </div>
+                <h3 class="font-bold text-slate-800 mb-2">${esc(layer.name)}</h3>
+                <p class="text-xs text-slate-500 line-clamp-2">${esc(layer.desc)}</p>
+                <div class="flex items-center justify-between mt-4 mb-1">
+                    <span class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">${esc(layer.owner)}</span>
+                    <span class="text-[10px] mono text-slate-400">${layer.maturity}%</span>
+                </div>
+                <div class="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div class="h-full bg-blue-500 opacity-30" style="width:${layer.maturity}%"></div>
+                </div>
+            </div>`;
+        }).join("");
+        grid.querySelectorAll("[data-id]").forEach(el => {
+            const id = Number(el.dataset.id);
+            el.addEventListener("click", () => selectLayer(id));
+            el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectLayer(id); } });
+        });
+    }
+
+    function selectLayer(id, skipScroll) {
+        activeLayerId = id;
+        const layer = layers.find(l => l.id === id);
+        if (!layer) return;
+        const v = document.getElementById("detailsView");
+        const sc = `status-${layer.status.toLowerCase()}`, ec = `ev-${layer.evidence.toLowerCase()}`;
+        document.getElementById("detailStatus").innerHTML =
+            `<span class="status-pill ${sc} px-3 py-1 text-xs">${STATE_LABEL[layer.status]}</span>` +
+            `<span class="ev-pill ${ec} px-3 py-1 text-xs">${EV_LABEL[layer.evidence]}</span>`;
+        document.getElementById("detailName").innerText = layer.name;
+        document.getElementById("detailDesc").innerText = layer.desc;
+        document.getElementById("detailOwner").innerText = layer.owner;
+        document.getElementById("detailHorizon").innerText = layer.horizon;
+        document.getElementById("detailMaturity").innerText = layer.maturity + "%";
+        document.getElementById("detailContracts").innerHTML = layer.contracts.map(c => `<div>${esc(c)}</div>`).join("");
+        document.getElementById("detailFunctions").innerHTML = layer.functions.map(f => `<li>• ${esc(f)}</li>`).join("");
+        document.getElementById("detailAction").innerText = layer.action;
+        document.getElementById("detailReality").innerHTML = `<p>${esc(layer.reality)}</p>`;
+        v.classList.remove("hidden");
+        history.replaceState(null, "", "#layer-" + id);
+        renderLayerGrid();
+        if (!skipScroll) v.scrollIntoView({ behavior: "smooth" });
+    }
+
+    function renderRiskRegister() {
+        document.getElementById("riskRegister").innerHTML = layers.map(l => `
+            <tr class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 font-semibold text-slate-700">${pad2(l.id)} · ${esc(l.name)}</td>
+                <td class="px-4 py-3"><span class="status-pill status-${l.status.toLowerCase()}">${STATE_LABEL[l.status]}</span></td>
+                <td class="px-4 py-3"><span class="ev-pill ev-${l.evidence.toLowerCase()}">${EV_LABEL[l.evidence]}</span></td>
+                <td class="px-4 py-3 text-slate-600">${esc(l.risk)}</td>
+                <td class="px-4 py-3 text-slate-600 whitespace-nowrap">${esc(l.owner)}</td>
+                <td class="px-4 py-3 text-slate-600">${esc(l.action)}</td>
+                <td class="px-4 py-3 text-slate-500 mono whitespace-nowrap">${esc(l.horizon)}</td>
+            </tr>`).join("");
+    }
+
+    function initChart() {
+        const ctx = document.getElementById("maturityChart").getContext("2d");
+        chart = new Chart(ctx, {
+            type: "radar",
+            data: {
+                labels: layers.map(l => l.name),
+                datasets: [{
+                    label: "Layer maturity %",
+                    data: layers.map(l => l.maturity),
+                    fill: true,
+                    backgroundColor: "rgba(37,99,235,0.10)",
+                    borderColor: "rgba(37,99,235,1)",
+                    pointBackgroundColor: "rgba(37,99,235,1)",
+                    pointBorderColor: "#fff",
+                    pointHoverBackgroundColor: "#fff",
+                    pointHoverBorderColor: "rgba(37,99,235,1)"
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { r: {
+                    angleLines: { color: "rgba(51,65,85,0.1)" },
+                    grid: { color: "rgba(51,65,85,0.1)" },
+                    suggestedMin: 0, suggestedMax: 100,
+                    ticks: { display: false },
+                    pointLabels: { font: { size: 10 }, color: "#475569" }
+                }},
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: c => `${c.label}: ${c.raw}% maturity` } }
+                }
+            }
+        });
+    }
+
+    function bindControls() {
+        document.getElementById("printBtn").addEventListener("click", () => window.print());
+        document.getElementById("sortSelect").addEventListener("change", e => { activeSort = e.target.value; renderLayerGrid(); });
+        document.querySelectorAll(".filter-chip").forEach(chip => {
+            chip.addEventListener("click", () => {
+                activeFilter = chip.dataset.filter;
+                document.querySelectorAll(".filter-chip").forEach(c => c.setAttribute("aria-pressed", String(c === chip)));
+                renderLayerGrid();
+            });
+        });
+        document.addEventListener("keydown", e => {
+            if (e.key === "Escape") { document.getElementById("detailsView").classList.add("hidden"); activeLayerId = null; renderLayerGrid(); }
+        });
+    }
+
+    window.onload = () => {
+        document.getElementById("asOf").innerText = "As of " + new Date().toISOString().slice(0,10);
+        renderStats();
+        renderLayerGrid();
+        renderRiskRegister();
+        initChart();
+        bindControls();
+        const m = location.hash.match(/^#layer-(\d+)$/);
+        if (m) selectLayer(Number(m[1]), true);
+    };
+</script>
+</body>
+</html>
