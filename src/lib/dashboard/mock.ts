@@ -22,6 +22,7 @@ import type {
   PermitForecastBucket,
   PipelineStage,
   RevenueRule,
+  SalesIntelligence,
   VoiceSessionSummary,
   VoiceTranscriptTurn,
 } from './types';
@@ -851,6 +852,80 @@ export const getVoiceTranscript = (): VoiceTranscriptTurn[] => [
     routed: 'AR-Collector',
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Sales Intelligence (GPPI v2.0)
+//
+// Mirrors the backend engine output (backend/sales) for the default snapshot:
+// run_simulation(team_size=8, lead_count=40, months_of_real_data=4, seed=42).
+// Swap point: replace the body with a fetch to `${API_BASE}/sales/dashboard`.
+// ---------------------------------------------------------------------------
+
+export const getSalesIntelligence = (): SalesIntelligence => ({
+  truthTag: 'SIMULATED',
+  label: 'SIMULATED MODEL OUTPUT',
+  neededNext: 'ACTUAL NOBLEPORT SALES DATASET',
+  decisionAuthority: 'Human Review Required',
+  generatedAt: NOW_ISO,
+  weights: {
+    gross_profit: 0.4,
+    revenue: 0.25,
+    avg_job_size: 0.15,
+    close_rate: 0.1,
+    lead_response_time: 0.05,
+    customer_satisfaction: 0.05,
+  },
+  headline: {
+    grossProfit: 1_315_523,
+    revenue: 4_520_256,
+    grossMarginPct: 0.291,
+    averageJobSize: 85_013,
+    avgCloseRate: 0.424,
+  },
+  leaderboard: [
+    { repId: 'rep-06', name: 'Sofia Marchetti', gppi: 94.7, rank: 1, percentile: 1.0, grossProfit: 370_306, revenue: 1_176_397, avgJobSize: 98_033, closeRate: 0.923, leadResponseHours: 2.3, csat: 4.63, topPerformer: true },
+    { repId: 'rep-02', name: 'Jordan Pell', gppi: 46.4, rank: 2, percentile: 0.857, grossProfit: 193_980, revenue: 601_479, avgJobSize: 120_296, closeRate: 0.312, leadResponseHours: 4.9, csat: 4.61, topPerformer: true },
+    { repId: 'rep-05', name: 'Andre Beaumont', gppi: 33.8, rank: 3, percentile: 0.714, grossProfit: 148_025, revenue: 601_573, avgJobSize: 66_841, closeRate: 0.562, leadResponseHours: 1.9, csat: 4.07, topPerformer: false },
+    { repId: 'rep-08', name: 'Tom Castellano', gppi: 32.0, rank: 4, percentile: 0.571, grossProfit: 139_402, revenue: 459_456, avgJobSize: 114_864, closeRate: 0.25, leadResponseHours: 5.0, csat: 4.47, topPerformer: false },
+    { repId: 'rep-07', name: 'Wes Coleman', gppi: 30.1, rank: 5, percentile: 0.429, grossProfit: 118_011, revenue: 504_069, avgJobSize: 100_814, closeRate: 0.417, leadResponseHours: 3.1, csat: 4.02, topPerformer: false },
+    { repId: 'rep-01', name: "Liam O'Donnell", gppi: 19.8, rank: 6, percentile: 0.286, grossProfit: 130_984, revenue: 474_235, avgJobSize: 79_039, closeRate: 0.286, leadResponseHours: 5.1, csat: 3.59, topPerformer: false },
+    { repId: 'rep-04', name: 'Grace Yun', gppi: 16.8, rank: 7, percentile: 0.143, grossProfit: 135_440, revenue: 406_907, avgJobSize: 50_863, closeRate: 0.381, leadResponseHours: 5.8, csat: 4.35, topPerformer: false },
+    { repId: 'rep-03', name: 'Priya Anand', gppi: 6.9, rank: 8, percentile: 0.0, grossProfit: 79_375, revenue: 296_141, avgJobSize: 49_357, closeRate: 0.261, leadResponseHours: 3.8, csat: 4.45, topPerformer: false },
+  ],
+  hierarchy: [
+    { key: 'adu', name: 'ADUs', tier: 1, rank: 1, leadFeeder: false, typicalJobMid: 302_500 },
+    { key: 'addition', name: 'Additions', tier: 1, rank: 2, leadFeeder: false, typicalJobMid: 250_000 },
+    { key: 'design_build', name: 'Design-Build', tier: 1, rank: 3, leadFeeder: false, typicalJobMid: 375_000 },
+    { key: 'investor_redevelopment', name: 'Investor Redevelopment', tier: 1, rank: 4, leadFeeder: false, typicalJobMid: 550_000 },
+    { key: 'property_acquisition', name: 'Property Acquisition Services', tier: 1, rank: 5, leadFeeder: false, typicalJobMid: 175_000 },
+    { key: 'roofing', name: 'Roofing', tier: 2, rank: 6, leadFeeder: true, typicalJobMid: 51_500 },
+    { key: 'exterior_restoration', name: 'Exterior Restoration', tier: 2, rank: 7, leadFeeder: false, typicalJobMid: 82_500 },
+    { key: 'whole_house_renovation', name: 'Whole House Renovations', tier: 2, rank: 8, leadFeeder: false, typicalJobMid: 270_000 },
+    { key: 'kitchen', name: 'Kitchens', tier: 3, rank: 9, leadFeeder: true, typicalJobMid: 77_500 },
+    { key: 'bathroom', name: 'Bathrooms', tier: 3, rank: 10, leadFeeder: true, typicalJobMid: 28_500 },
+    { key: 'maintenance_membership', name: 'Maintenance Memberships', tier: 4, rank: 11, leadFeeder: true, typicalJobMid: 3_600 },
+    { key: 'painting', name: 'Painting', tier: 4, rank: 12, leadFeeder: true, typicalJobMid: 14_500 },
+    { key: 'property_services', name: 'Property Services', tier: 4, rank: 13, leadFeeder: true, typicalJobMid: 6_400 },
+  ],
+  routing: { premium: 25, standard: 15, topPerformers: 2, developingStaff: 6 },
+  markets: [
+    { town: 'Newburyport', leads: 3, premium: 3, standard: 0 },
+    { town: 'Ipswich', leads: 9, premium: 4, standard: 5 },
+    { town: 'Manchester-by-the-Sea', leads: 6, premium: 6, standard: 0 },
+    { town: 'Essex', leads: 6, premium: 4, standard: 2 },
+    { town: 'Marblehead', leads: 7, premium: 4, standard: 3 },
+    { town: 'Portsmouth', leads: 2, premium: 2, standard: 0 },
+    { town: 'Rye', leads: 2, premium: 1, standard: 1 },
+    { town: 'New Castle', leads: 5, premium: 1, standard: 4 },
+  ],
+  readiness: {
+    monthsOfRealData: 4,
+    mode: 'simulation_primary',
+    realDataWeight: 0.333,
+    nextMilestone:
+      'Capture the full opportunity→deposit→completion funnel; reach 6 months of data to blend.',
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Overview composition

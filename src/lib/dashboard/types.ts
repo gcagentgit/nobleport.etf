@@ -204,6 +204,84 @@ export interface RevenueRule {
   violations: number;
 }
 
+// ---------------------------------------------------------------------------
+// Sales Intelligence (GPPI v2.0)
+// ---------------------------------------------------------------------------
+
+export type GppiKpiKey =
+  | 'gross_profit'
+  | 'revenue'
+  | 'avg_job_size'
+  | 'close_rate'
+  | 'lead_response_time'
+  | 'customer_satisfaction';
+
+export interface GppiRep {
+  repId: string;
+  name: string;
+  gppi: number; // 0..100
+  rank: number;
+  percentile: number; // 0..1
+  grossProfit: number;
+  revenue: number;
+  avgJobSize: number;
+  closeRate: number; // 0..1
+  leadResponseHours: number;
+  csat: number; // 0..5
+  topPerformer: boolean;
+}
+
+export interface SalesServiceLine {
+  key: string;
+  name: string;
+  tier: 1 | 2 | 3 | 4;
+  rank: number;
+  leadFeeder: boolean;
+  typicalJobMid: number;
+}
+
+export interface SalesMarketRow {
+  town: string;
+  leads: number;
+  premium: number;
+  standard: number;
+}
+
+export interface SalesRouting {
+  premium: number;
+  standard: number;
+  topPerformers: number;
+  developingStaff: number;
+}
+
+export interface SalesReadiness {
+  monthsOfRealData: number;
+  mode: 'simulation_primary' | 'blended' | 'data_primary';
+  realDataWeight: number; // 0..1
+  nextMilestone: string;
+}
+
+export interface SalesIntelligence {
+  truthTag: 'LIVE' | 'STAGED' | 'SIMULATED' | 'BLOCKED';
+  label: string;
+  neededNext: string;
+  decisionAuthority: string;
+  generatedAt: string;
+  weights: Record<GppiKpiKey, number>;
+  headline: {
+    grossProfit: number;
+    revenue: number;
+    grossMarginPct: number; // 0..1
+    averageJobSize: number;
+    avgCloseRate: number; // 0..1
+  };
+  leaderboard: GppiRep[];
+  hierarchy: SalesServiceLine[];
+  routing: SalesRouting;
+  markets: SalesMarketRow[];
+  readiness: SalesReadiness;
+}
+
 export interface DashboardOverview {
   generatedAt: string;
   kpis: KpiTile[];
