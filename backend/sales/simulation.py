@@ -21,9 +21,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from backend.governance.truth_layer import TruthTag
+from backend.sales.close_rate import CloseRateProjection, project_close_rate
 from backend.sales.gppi import GppiScore, RepStats, score_cohort
 from backend.sales.hierarchy import REVENUE_HIERARCHY, RevenueTier
 from backend.sales.lead_routing import Lead, RoutingPlan, route_leads
+from backend.sales.provenance import CaptureState, DataProvenance
 
 # Decision authority is human, always. This simulation never decides.
 DECISION_AUTHORITY = "Human Review Required"
@@ -113,17 +115,28 @@ class SalesSimulation:
     leaderboard: list[GppiScore]
     routing: RoutingPlan
     readiness: DataReadiness
+    capture: CaptureState
+    close_rate: CloseRateProjection
     seed: int
+
+    @property
+    def provenance(self) -> DataProvenance:
+        """v2.1 data-provenance label: SIMULATED | BLENDED | ACTUAL."""
+        return self.capture.provenance
 
     def to_dict(self) -> dict[str, object]:
         return {
+            "version": "2.1",
             "truth_tag": self.truth_tag.value,
-            "label": "SIMULATED MODEL OUTPUT",
+            "provenance": self.provenance.value,
+            "label": f"{self.provenance.value} MODEL OUTPUT",
             "needed_next": "ACTUAL NOBLEPORT SALES DATASET",
             "decision_authority": self.decision_authority,
             "purpose": self.purpose,
             "seed": self.seed,
             "readiness": self.readiness.to_dict(),
+            "capture": self.capture.to_dict(),
+            "close_rate": self.close_rate.to_dict(),
             "leaderboard": [s.to_dict() for s in self.leaderboard],
             "routing": self.routing.to_dict(),
         }
@@ -198,15 +211,20 @@ def run_simulation(
     team_size: int = 8,
     lead_count: int = 40,
     months_of_real_data: float = 0.0,
+    captured_opportunities: int = 0,
+    captured_completions: int = 0,
     seed: int = 42,
 ) -> SalesSimulation:
     """
-    Run a full v2.0 sales simulation.
+    Run a full v2.1 sales simulation.
 
     Deterministic in ``seed``: generates a team, computes the GPPI leaderboard,
-    and routes a lead board under the 80/20 profitable-lead rule. The result is
-    tagged SIMULATED — it informs human resource-allocation decisions, it does
-    not make them.
+    routes a lead board under the 80/20 profitable-lead rule, and attaches the
+    data-provenance gate (SIMULATED | BLENDED | ACTUAL) and the close-rate
+    growth projection. Provenance is data-capture-first: it is driven by the
+    captured opportunity/completion counts, not the calendar. The Truth-Layer
+    action tag stays SIMULATED — outputs inform human resource-allocation
+    decisions, they do not make them.
     """
     if team_size < 1:
         raise ValueError("team_size must be >= 1")
@@ -219,6 +237,17 @@ def run_simulation(
     leads = _generate_leads(rng, lead_count)
     routing = route_leads(leads, leaderboard)
 
+    capture = CaptureState(
+        months_of_real_data=months_of_real_data,
+        captured_opportunities=captured_opportunities,
+        captured_completions=captured_completions,
+    )
+
+    # The growth loop projects from NoblePort's real measured baseline
+    # (~6.25%–12.5%), not the synthetic cohort's inflated close rates — the
+    # baseline is the honest starting point per the v2.1 spec.
+    close_rate = project_close_rate(current=None)
+
     return SalesSimulation(
         truth_tag=TruthTag.SIMULATED,
         decision_authority=DECISION_AUTHORITY,
@@ -226,5 +255,7 @@ def run_simulation(
         leaderboard=leaderboard,
         routing=routing,
         readiness=DataReadiness(months_of_real_data=months_of_real_data),
+        capture=capture,
+        close_rate=close_rate,
         seed=seed,
     )

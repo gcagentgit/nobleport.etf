@@ -12,15 +12,28 @@ from __future__ import annotations
 
 from backend.governance.truth_layer import TruthTag
 from backend.sales import (
+    BASELINE_HIGH,
+    BASELINE_LOW,
+    CLOSE_RATE_CEILING,
     GPPI_WEIGHTS,
+    SALES_BUDGET_GATE_USD,
+    CaptureState,
+    DataProvenance,
+    Gate,
     Lead,
     LeadGrade,
     RepStats,
     RevenueTier,
+    SalesAction,
     SimulationMode,
     aggregate,
+    classify_action,
+    collaboration_map,
+    enrich_lead,
+    governance_matrix,
     grade_lead,
     profitability_score,
+    project_close_rate,
     route_leads,
     run_simulation,
     score_cohort,
@@ -230,9 +243,140 @@ def test_dashboard_aggregate_shape():
     sim = run_simulation(team_size=8, lead_count=40, seed=5)
     payload = aggregate(sim)
     assert payload["label"] == "SIMULATED MODEL OUTPUT"
+    assert payload["version"] == "2.1"
     assert set(payload["headline"]) >= {"gross_profit", "revenue", "gross_margin_pct"}
     assert len(payload["markets"]) == 8
     # Premium + standard routed leads reconcile with the lead count.
     routed = payload["routing"]["premium"] + payload["routing"]["standard"]
     assert routed == 40
     assert {"lead", "sales", "financial"} <= set(payload["metric_groups"])
+    # v2.1 War Board sections present.
+    assert {"capture", "close_rate", "governance", "collaboration"} <= set(payload)
+
+
+# ---------------------------------------------------------------------------
+# v2.1 — Data provenance (SIMULATED | BLENDED | ACTUAL), capture-first
+# ---------------------------------------------------------------------------
+
+def test_provenance_starts_simulated():
+    assert CaptureState().provenance is DataProvenance.SIMULATED
+    assert CaptureState(months_of_real_data=24).provenance is DataProvenance.SIMULATED
+
+
+def test_capture_first_time_alone_does_not_promote():
+    """Twelve months with an empty CRM is still SIMULATED — capture-first."""
+    state = CaptureState(months_of_real_data=18, captured_opportunities=0)
+    assert state.provenance is DataProvenance.SIMULATED
+
+
+def test_provenance_blended_on_captured_data():
+    state = CaptureState(months_of_real_data=3, captured_opportunities=60, captured_completions=5)
+    assert state.provenance is DataProvenance.BLENDED
+    assert 0.0 < state.real_data_weight < 1.0
+
+
+def test_provenance_actual_requires_time_and_capture():
+    enough = CaptureState(months_of_real_data=12, captured_opportunities=200, captured_completions=30)
+    assert enough.provenance is DataProvenance.ACTUAL
+    assert enough.real_data_weight == 1.0
+    # Plenty of data but not enough calendar -> still BLENDED.
+    early = CaptureState(months_of_real_data=8, captured_opportunities=300, captured_completions=40)
+    assert early.provenance is DataProvenance.BLENDED
+
+
+def test_provenance_blocking_gaps_reported():
+    state = CaptureState(months_of_real_data=2, captured_opportunities=10, captured_completions=0)
+    gaps = state.blocking_gaps
+    assert len(gaps) == 3  # months, opportunities, completions all short
+
+
+def test_simulation_provenance_flows_through():
+    sim = run_simulation(captured_opportunities=200, captured_completions=30, months_of_real_data=12)
+    assert sim.provenance is DataProvenance.ACTUAL
+    assert sim.to_dict()["provenance"] == "ACTUAL"
+    assert sim.to_dict()["label"] == "ACTUAL MODEL OUTPUT"
+
+
+# ---------------------------------------------------------------------------
+# v2.1 — Close-rate growth loop
+# ---------------------------------------------------------------------------
+
+def test_close_rate_projects_from_baseline_midpoint():
+    proj = project_close_rate()
+    assert proj.current == (BASELINE_LOW + BASELINE_HIGH) / 2
+    assert proj.projected > proj.current  # levers add lift
+
+
+def test_close_rate_never_exceeds_ceiling():
+    proj = project_close_rate(current=0.40)
+    assert proj.projected <= CLOSE_RATE_CEILING + 1e-9
+
+
+def test_close_rate_marginal_gains_sum_to_total():
+    proj = project_close_rate(current=0.10)
+    total = sum(l["marginal_gain"] for l in proj.applied)
+    # Per-lever marginals are rounded to 4dp, so allow cumulative rounding slack.
+    assert abs(total - (proj.projected - proj.current)) < 1e-3
+
+
+# ---------------------------------------------------------------------------
+# v2.1 — Human-gated sales governance
+# ---------------------------------------------------------------------------
+
+def test_routing_is_autonomous():
+    d = classify_action(SalesAction.ROUTE_LEAD)
+    assert d.gate is Gate.AUTO
+    assert d.requires_human is False
+    assert d.tag is TruthTag.LIVE
+
+
+def test_contract_approval_is_human_gated():
+    d = classify_action(SalesAction.APPROVE_CONTRACT)
+    assert d.gate is Gate.HUMAN
+    assert d.tag is TruthTag.STAGED
+
+
+def test_budget_gate_demotes_autonomous_action():
+    d = classify_action(SalesAction.ROUTE_LEAD, amount_usd=SALES_BUDGET_GATE_USD + 1)
+    assert d.gate is Gate.HUMAN
+    assert d.escalated is True
+
+
+def test_unknown_sales_action_fails_closed():
+    d = classify_action("totally_unknown_action")
+    assert d.tag is TruthTag.BLOCKED
+    assert d.requires_human is True
+
+
+def test_governance_matrix_complete():
+    matrix = governance_matrix()
+    assert len(matrix) == len(SalesAction)
+
+
+# ---------------------------------------------------------------------------
+# v2.1 — Collaboration layer + tax-aware enrichment (advisory only)
+# ---------------------------------------------------------------------------
+
+def test_collaboration_map_has_all_agents():
+    systems = set()
+    for h in collaboration_map():
+        systems.add(h["from"])
+        systems.add(h["to"])
+    assert {"Stephanie.ai", "PermitStream.ai", "GCagent.ai", "Cyborg.ai"} <= systems
+
+
+def test_tax_enrichment_is_advisory_and_cpa_gated():
+    adv = enrich_lead("investor_redevelopment", estimated_value=500_000)
+    assert adv.eligible is True
+    assert adv.advisory_only is True
+    assert adv.cpa_review_required is True
+    assert adv.topics  # has talking points
+    assert adv.governance["requires_human"] is True
+
+
+def test_tax_enrichment_ineligible_for_small_jobs():
+    adv = enrich_lead("painting", estimated_value=6_000)
+    assert adv.eligible is False
+    assert adv.topics == []
+    # Still advisory-only/CPA-gated even when ineligible — guardrails never drop.
+    assert adv.cpa_review_required is True

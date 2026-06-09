@@ -2,7 +2,14 @@ import { Topbar } from '@/components/dashboard/Topbar';
 import { Panel } from '@/components/dashboard/Panel';
 import { fetchSalesIntelligence } from '@/lib/dashboard/api';
 import { fmtPct, fmtUSD, fmtUSDCompact } from '@/lib/dashboard/format';
-import type { GppiKpiKey, GppiRep, SalesServiceLine } from '@/lib/dashboard/types';
+import type {
+  DataProvenance,
+  GppiKpiKey,
+  GppiRep,
+  SalesServiceLine,
+} from '@/lib/dashboard/types';
+
+const PROVENANCE_STAGES: DataProvenance[] = ['SIMULATED', 'BLENDED', 'ACTUAL'];
 
 export const dynamic = 'force-dynamic';
 
@@ -24,16 +31,17 @@ const TIER_LABEL: Record<number, string> = {
 
 export default async function SalesPage() {
   const sales = await fetchSalesIntelligence();
-  const { headline, leaderboard, routing, readiness } = sales;
+  const { headline, leaderboard, routing, capture, closeRate } = sales;
   const leader = leaderboard[0];
   const tiers = [1, 2, 3, 4] as const;
   const maxMarketLeads = Math.max(...sales.markets.map((m) => m.leads), 1);
+  const activeStage = PROVENANCE_STAGES.indexOf(sales.provenance);
 
   return (
     <>
-      <Topbar pageTitle="Sales Intelligence · GPPI v2.0" generatedAt={sales.generatedAt} />
+      <Topbar pageTitle="Sales OS · Revenue War Board (v2.1)" generatedAt={sales.generatedAt} />
       <main className="flex-1 space-y-4 px-4 py-4 sm:px-6 sm:py-6">
-        {/* Truth-layer banner */}
+        {/* Provenance banner — SIMULATED → BLENDED → ACTUAL */}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3">
           <div className="flex items-center gap-3">
             <span className="pill-warn">{sales.truthTag}</span>
@@ -42,8 +50,23 @@ export default async function SalesPage() {
               <span className="text-amber-200/70"> · {sales.decisionAuthority}</span>
             </div>
           </div>
-          <div className="text-[11px] text-amber-200/80">
-            Needed next: <span className="font-semibold">{sales.neededNext}</span>
+          <div className="flex items-center gap-1.5">
+            {PROVENANCE_STAGES.map((stage, i) => (
+              <span key={stage} className="flex items-center gap-1.5">
+                <span
+                  className={
+                    i === activeStage
+                      ? 'pill-warn'
+                      : i < activeStage
+                        ? 'pill-ok'
+                        : 'pill-mute opacity-60'
+                  }
+                >
+                  {stage}
+                </span>
+                {i < PROVENANCE_STAGES.length - 1 && <span className="text-amber-200/40">→</span>}
+              </span>
+            ))}
           </div>
         </div>
 
@@ -141,30 +164,119 @@ export default async function SalesPage() {
             </div>
           </Panel>
 
-          {/* Data readiness gate */}
-          <Panel title="Model Readiness" subtitle="simulation → NoblePort-specific">
+          {/* Data-capture-first gate */}
+          <Panel title="Data Capture Gate" subtitle="capture-first · SIMULATED → ACTUAL">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-ink-200">Mode</span>
-              <span className={readiness.mode === 'data_primary' ? 'pill-ok' : readiness.mode === 'blended' ? 'pill-warn' : 'pill-info'}>
-                {readiness.mode.replace('_', ' ')}
+              <span className="text-sm text-ink-200">Provenance</span>
+              <span className={capture.provenance === 'ACTUAL' ? 'pill-ok' : capture.provenance === 'BLENDED' ? 'pill-warn' : 'pill-info'}>
+                {capture.provenance}
               </span>
             </div>
             <div className="mt-3">
               <div className="flex items-center justify-between text-[12px] text-ink-300">
                 <span>Real-data weight</span>
-                <span className="num">{fmtPct(readiness.realDataWeight)}</span>
+                <span className="num">{fmtPct(capture.realDataWeight)}</span>
               </div>
               <div className="mt-1 h-2 w-full rounded-full bg-ink-800">
                 <div
                   className="h-2 rounded-full bg-emerald-500"
-                  style={{ width: `${readiness.realDataWeight * 100}%` }}
+                  style={{ width: `${capture.realDataWeight * 100}%` }}
                 />
               </div>
-              <div className="mt-1 text-[11px] text-ink-400">
-                {readiness.monthsOfRealData} of 12 months captured
-              </div>
             </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-ink-400">{readiness.nextMilestone}</p>
+            <div className="mt-3">
+              <div className="panel-subtitle mb-1">Gaps to ACTUAL</div>
+              <ul className="space-y-1 text-[11px] text-ink-300">
+                {capture.blockingGaps.map((g) => (
+                  <li key={g} className="flex items-center gap-1.5">
+                    <span className="text-amber-400">▸</span>
+                    {g}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-ink-400">{capture.nextAction}</p>
+          </Panel>
+        </div>
+
+        {/* Close-rate growth loop */}
+        <Panel
+          title="Close-Rate Growth Loop"
+          subtitle={`baseline ${fmtPct(closeRate.baselineLow)}–${fmtPct(closeRate.baselineHigh)} · ceiling ${fmtPct(closeRate.ceiling)}`}
+        >
+          <div className="mb-4 grid grid-cols-3 gap-3">
+            <Stat label="Baseline (now)" value={fmtPct(closeRate.current)} />
+            <Stat label="Projected" value={fmtPct(closeRate.projected)} tone="ok" />
+            <Stat
+              label="Lift"
+              value={`+${fmtPct(closeRate.projected - closeRate.current)}`}
+              tone="info"
+            />
+          </div>
+          <div className="space-y-2">
+            {closeRate.levers.map((lv) => {
+              const pctOfCeiling = (lv.runningRate / closeRate.ceiling) * 100;
+              return (
+                <div key={lv.key}>
+                  <div className="flex items-center justify-between text-[12px]">
+                    <span className="text-ink-200">
+                      {lv.name} <span className="text-ink-500">· {lv.owner}</span>
+                    </span>
+                    <span className="num text-ink-100">
+                      {fmtPct(lv.runningRate)} <span className="text-emerald-300">+{fmtPct(lv.lift)}</span>
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full rounded-full bg-ink-800">
+                    <div className="h-1.5 rounded-full bg-violet-500" style={{ width: `${pctOfCeiling}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Panel>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {/* Human-gated governance */}
+          <Panel title="Human-Gated Sales Governance" subtitle="AUTO vs HUMAN per action" padded={false}>
+            <table className="w-full text-sm">
+              <thead className="bg-ink-900/80 text-[11px] uppercase tracking-wider text-ink-400">
+                <tr>
+                  <th className="px-4 py-2 text-left">Action</th>
+                  <th className="px-4 py-2 text-left">Gate</th>
+                  <th className="px-4 py-2 text-left">Rationale</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-700">
+                {sales.governance.map((g) => (
+                  <tr key={g.action} className="row-hover">
+                    <td className="px-4 py-2.5 font-medium text-ink-100">{g.action.replace(/_/g, ' ')}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={g.gate === 'auto' ? 'pill-ok' : 'pill-warn'}>{g.gate}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-[12px] text-ink-300">{g.rationale}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Panel>
+
+          {/* Agent collaboration layer */}
+          <Panel title="Collaboration Layer" subtitle="Stephanie · PermitStream · GCagent · Cyborg" padded={false}>
+            <ul className="divide-y divide-ink-700">
+              {sales.collaboration.map((h) => (
+                <li key={h.trigger} className="px-4 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] text-ink-200">{h.trigger}</span>
+                    {h.humanGated && <span className="pill-warn text-[9px]">human-gated</span>}
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-400">
+                    <span className="pill-mute">{h.from}</span>
+                    <span className="text-ink-500">→</span>
+                    <span className="pill-info">{h.to}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </Panel>
         </div>
 

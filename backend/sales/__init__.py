@@ -17,12 +17,32 @@ inputs today and on real opportunity→deposit→completion data once captured.
 
 from __future__ import annotations
 
+from backend.sales.close_rate import (
+    BASELINE_HIGH,
+    BASELINE_LOW,
+    CLOSE_RATE_CEILING,
+    GROWTH_LEVERS,
+    CloseRateProjection,
+    GrowthLever,
+    project_close_rate,
+)
+from backend.sales.collaboration import COLLABORATION_MAP, Handoff, collaboration_map
 from backend.sales.dashboard import (
     METRIC_CATALOG,
     MetricDef,
     aggregate,
     hierarchy_view,
     metric_groups,
+)
+from backend.sales.enrichment import TaxAdvisory, enrich_lead
+from backend.sales.governance import (
+    SALES_AUTHORITY,
+    SALES_BUDGET_GATE_USD,
+    Gate,
+    SalesAction,
+    SalesDisposition,
+    classify_action,
+    governance_matrix,
 )
 from backend.sales.gppi import (
     GPPI_WEIGHTS,
@@ -50,6 +70,10 @@ from backend.sales.lead_routing import (
     grade_lead,
     profitability_score,
     route_leads,
+)
+from backend.sales.provenance import (
+    CaptureState,
+    DataProvenance,
 )
 from backend.sales.simulation import (
     MARKETS,
@@ -90,6 +114,32 @@ __all__ = [
     "SalesSimulation",
     "SimulationMode",
     "run_simulation",
+    # provenance (v2.1)
+    "CaptureState",
+    "DataProvenance",
+    # close-rate growth loop (v2.1)
+    "BASELINE_LOW",
+    "BASELINE_HIGH",
+    "CLOSE_RATE_CEILING",
+    "GROWTH_LEVERS",
+    "CloseRateProjection",
+    "GrowthLever",
+    "project_close_rate",
+    # sales governance (v2.1)
+    "SALES_AUTHORITY",
+    "SALES_BUDGET_GATE_USD",
+    "Gate",
+    "SalesAction",
+    "SalesDisposition",
+    "classify_action",
+    "governance_matrix",
+    # collaboration layer (v2.1)
+    "COLLABORATION_MAP",
+    "Handoff",
+    "collaboration_map",
+    # tax-aware enrichment (v2.1, advisory only)
+    "TaxAdvisory",
+    "enrich_lead",
     # dashboard
     "METRIC_CATALOG",
     "MetricDef",

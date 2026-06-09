@@ -1,7 +1,9 @@
-# NoblePort Sales Simulation v2.0 — Built Out, Truth-Tagged
+# NoblePort Sales OS v2.1 — Progressive Revenue Execution Layer
 
-**Source spec:** NoblePort Sales Simulation v2.0 (truth-review upgrade).
-**Status:** `SIMULATED` — SIMULATED MODEL OUTPUT.
+**Source spec:** NoblePort Sales Simulation v2.0 (truth-review upgrade) +
+v2.1 roadmap (`GCagent/nobleport` issue #20, "Progressive Revenue Execution
+Layer").
+**Status:** `SIMULATED` Truth-Layer tag · data provenance `SIMULATED | BLENDED | ACTUAL`.
 **Decision authority:** Human Review Required.
 **Purpose:** Training, forecasting, and resource allocation — *not* hiring or
 termination decisions.
@@ -27,7 +29,18 @@ Truth-Layer tag; the same engines run unchanged on real data once it exists.
 | Dashboard v1 | `backend/sales/dashboard.py` | Lead/sales/financial metric catalog + aggregation; market breakdown |
 | API | `backend/api/sales.py` | `/api/sales/{hierarchy,metrics,leaderboard,routing,simulation,dashboard}` |
 | Mission Control UI | `src/app/dashboard/sales/page.tsx` | GPPI leaderboard, weighting, hierarchy, routing, market metrics, readiness gate |
-| Tests | `backend/tests/test_sales.py` | 23 tests asserting the model's hard guarantees |
+| Tests | `backend/tests/test_sales.py` | 40 tests asserting the model's hard guarantees |
+
+### v2.1 — Progressive Revenue Execution Layer
+
+| Roadmap item | Code | What it does |
+|--------------|------|--------------|
+| Truth layer `SIMULATED \| BLENDED \| ACTUAL` | `backend/sales/provenance.py` | Data-provenance gate, **capture-first** (count-gated, not calendar-gated) |
+| Close-rate growth loop | `backend/sales/close_rate.py` | Projects from NoblePort's real ~6.25%–12.5% baseline via compounding levers, capped at a realistic ceiling |
+| Human-gated governance | `backend/sales/governance.py` | AUTO vs HUMAN per sales action, reusing LIVE/STAGED/BLOCKED tags; $25k budget gate; fail-closed |
+| Collaboration layer | `backend/sales/collaboration.py` | Stephanie / PermitStream / GCagent / Cyborg handoff map |
+| Tax-aware enrichment | `backend/sales/enrichment.py` | Advisory-only, CPA-review-required real-estate talking points (guardrails in code) |
+| Revenue War Board UI | `src/app/dashboard/sales/page.tsx` | Provenance progression, capture gate, close-rate loop, governance, collaboration |
 
 ---
 
@@ -97,23 +110,71 @@ who build their numbers on them. Routing is deterministic and auditable.
 
 ---
 
-## 12-month data goal
+## Data provenance — capture-first (v2.1)
 
-The `DataReadiness` gate tracks the migration from generic simulation to a
-NoblePort-specific model:
+The v2.1 truth layer classifies the **provenance of the data** behind every
+output, and promotion is **capture-first**: the model earns its label by
+recording real funnel data, not by waiting on the calendar.
 
-| Real data | Mode | Meaning |
-|-----------|------|---------|
-| < 6 months | `simulation_primary` | Simulation leads; capture the full funnel |
-| 6–12 months | `blended` | Real data weighted in alongside simulation |
-| 12+ months | `data_primary` | Real performance is primary; retrain quarterly |
+| Provenance | Gate | Meaning |
+|------------|------|---------|
+| `SIMULATED` | default | No real data, or real data below the BLENDED bar |
+| `BLENDED` | ≥ 40 captured opportunities **and** ≥ 1 completion | Real + synthetic |
+| `ACTUAL` | ≥ 12 months **and** ≥ 200 opportunities **and** ≥ 30 completions | NoblePort-specific |
+
+> **Twelve months of an empty CRM is still `SIMULATED`.** Time alone never
+> promotes the model — see `test_capture_first_time_alone_does_not_promote`.
 
 Once NoblePort captures opportunities → appointments → estimates → contracts →
 deposits → completed projects, the AI forecasts win probability, project size,
 margin, referral, and change-order probability on its own Essex County / NH
-Seacoast market — no longer a generalized construction model, but a
-NoblePort-specific one. The GPPI and routing engines run unchanged on that real
-data; only the inputs change.
+Seacoast market. The GPPI and routing engines run unchanged on that real data;
+only the inputs change.
+
+## Close-rate growth loop (v2.1)
+
+NoblePort's measured baseline is ~6.25%–12.5%. The loop projects improvement by
+compounding operating levers — each owned by a system — capped at a realistic
+0.45 design-build ceiling:
+
+| Lever | Owner | Lift |
+|-------|-------|------|
+| Sub-hour lead response | Stephanie.ai | +18% |
+| 80/20 profitable-lead routing | Sales OS | +15% |
+| Disciplined multi-touch follow-up | Sales OS | +12% |
+| 48-hour estimate turnaround | GCagent.ai | +10% |
+| GPPI-driven rep coaching | Sales OS | +8% |
+| Permit/compliance proof at proposal | PermitStream.ai | +6% |
+
+The honest ceiling matters as much as the levers: no process turns 10% into 90%.
+
+## Human-gated sales governance (v2.1)
+
+The OS automates routing and scoring; anything touching a customer's money or a
+person's standing is **HUMAN**-gated and staged for sign-off. A $25k budget gate
+demotes otherwise-autonomous actions, and unknown actions fail closed to
+`BLOCKED`.
+
+- **AUTO (LIVE):** route lead, score reps, suggest follow-up, draft proposal
+- **HUMAN (STAGED):** reassign lead, apply discount, send proposal, approve
+  contract, override GPPI rank, tax advisory
+
+## Collaboration layer (v2.1)
+
+The Sales OS hands off across the revenue spine to Stephanie.ai (intake),
+PermitStream.ai (permit feasibility), GCagent.ai (proposal/build), and Cyborg.ai
+(governance/audit). Proposal-send, contract-approval, and discount-override
+handoffs are human-gated; every routing/scoring decision is mirrored to Cyborg
+for the audit chain.
+
+## Tax-aware enrichment — advisory only (v2.1)
+
+A *future* capability shipped now as an explicit, guard-railed stub: for
+investor/acquisition/estate deals the OS can surface tax-aware **questions to
+take to a CPA** (1031 exchange, cost segregation, basis classification,
+opportunity zones). Every output is `advisory_only` + `cpa_review_required` and
+routed through the human gate — the guardrails live in code so this can never
+quietly become unreviewed tax advice.
 
 ---
 
@@ -140,7 +201,14 @@ fields the simulation uses.
 | `GET /api/sales/leaderboard` | GPPI leaderboard for a SIMULATED team |
 | `GET /api/sales/routing` | 80/20 profitable-lead routing plan |
 | `GET /api/sales/simulation` | Full snapshot: leaderboard + routing + readiness |
-| `GET /api/sales/dashboard` | Aggregated v1 dashboard payload |
+| `GET /api/sales/dashboard` | Aggregated Revenue War Board payload |
+| `GET /api/sales/close-rate` | Close-rate growth loop from the ~6.25%–12.5% baseline |
+| `GET /api/sales/governance` | Human-gated sales authority matrix |
+| `GET /api/sales/governance/classify` | Classify one action (AUTO/HUMAN + tag) |
+| `GET /api/sales/collaboration` | Agent handoff map |
+| `GET /api/sales/enrichment` | CPA-gated tax-aware talking points (advisory only) |
 
-All accept `team_size`, `lead_count`, `months_of_real_data`, and `seed` query
-parameters; all are read-only and SIMULATED.
+Snapshot endpoints accept `team_size`, `lead_count`, `months_of_real_data`,
+`captured_opportunities`, `captured_completions`, and `seed`; all are read-only.
+The Truth-Layer action tag stays `SIMULATED`; the data-provenance label is
+computed from the captured-data counts.

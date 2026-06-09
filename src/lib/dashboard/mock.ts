@@ -862,8 +862,10 @@ export const getVoiceTranscript = (): VoiceTranscriptTurn[] => [
 // ---------------------------------------------------------------------------
 
 export const getSalesIntelligence = (): SalesIntelligence => ({
+  version: '2.1',
   truthTag: 'SIMULATED',
-  label: 'SIMULATED MODEL OUTPUT',
+  provenance: 'BLENDED',
+  label: 'BLENDED MODEL OUTPUT',
   neededNext: 'ACTUAL NOBLEPORT SALES DATASET',
   decisionAuthority: 'Human Review Required',
   generatedAt: NOW_ISO,
@@ -925,6 +927,55 @@ export const getSalesIntelligence = (): SalesIntelligence => ({
     nextMilestone:
       'Capture the full opportunity→deposit→completion funnel; reach 6 months of data to blend.',
   },
+  capture: {
+    provenance: 'BLENDED',
+    monthsOfRealData: 4,
+    capturedOpportunities: 72,
+    capturedCompletions: 6,
+    realDataWeight: 0.2,
+    blockingGaps: [
+      '4/12 months of production data',
+      '72/200 captured opportunities',
+      '6/30 completed projects with realized GP',
+    ],
+    nextAction: 'Keep capturing the full funnel — close the gaps below to reach ACTUAL.',
+  },
+  closeRate: {
+    baselineLow: 0.0625,
+    baselineHigh: 0.125,
+    current: 0.0938,
+    projected: 0.1794,
+    ceiling: 0.45,
+    levers: [
+      { key: 'response_time', name: 'Sub-hour lead response', owner: 'Stephanie.ai', lift: 0.18, runningRate: 0.1106 },
+      { key: 'lead_routing', name: '80/20 profitable-lead routing', owner: 'Sales OS', lift: 0.15, runningRate: 0.1272 },
+      { key: 'follow_up', name: 'Disciplined multi-touch follow-up', owner: 'Sales OS', lift: 0.12, runningRate: 0.1425 },
+      { key: 'estimate_speed', name: '48-hour estimate turnaround', owner: 'GCagent.ai', lift: 0.1, runningRate: 0.1567 },
+      { key: 'gppi_coaching', name: 'GPPI-driven rep coaching', owner: 'Sales OS', lift: 0.08, runningRate: 0.1693 },
+      { key: 'proof_trust', name: 'Permit/compliance proof at proposal', owner: 'PermitStream.ai', lift: 0.06, runningRate: 0.1794 },
+    ],
+  },
+  governance: [
+    { action: 'route_lead', gate: 'auto', truthTag: 'LIVE', rationale: 'Internal assignment; reversible.' },
+    { action: 'score_reps', gate: 'auto', truthTag: 'LIVE', rationale: 'Read-only analytics.' },
+    { action: 'suggest_follow_up', gate: 'auto', truthTag: 'LIVE', rationale: 'Advisory nudge only.' },
+    { action: 'draft_proposal', gate: 'auto', truthTag: 'LIVE', rationale: 'Draft-state, not sent.' },
+    { action: 'reassign_lead', gate: 'human', truthTag: 'STAGED', rationale: "Alters a rep's pipeline / comp." },
+    { action: 'apply_discount', gate: 'human', truthTag: 'STAGED', rationale: 'Touches margin and price.' },
+    { action: 'send_proposal', gate: 'human', truthTag: 'STAGED', rationale: 'External commitment to a client.' },
+    { action: 'approve_contract', gate: 'human', truthTag: 'STAGED', rationale: 'Binds NoblePort; deposit gate.' },
+    { action: 'override_gppi_rank', gate: 'human', truthTag: 'STAGED', rationale: 'Overrides measured performance.' },
+    { action: 'tax_advisory', gate: 'human', truthTag: 'STAGED', rationale: 'Advisory only; CPA review required.' },
+  ],
+  collaboration: [
+    { trigger: 'New lead captured', from: 'Stephanie.ai', to: 'Sales OS', payload: ['contact', 'town', 'project_type', 'lead_value', 'response_time'], humanGated: false },
+    { trigger: 'Lead graded & routed', from: 'Sales OS', to: 'Stephanie.ai', payload: ['assigned_rep', 'lead_grade', 'profitability'], humanGated: false },
+    { trigger: 'Proposal ready to send', from: 'Sales OS', to: 'GCagent.ai', payload: ['scope', 'estimate', 'gross_margin_floor'], humanGated: true },
+    { trigger: 'Permit feasibility check at proposal', from: 'Sales OS', to: 'PermitStream.ai', payload: ['address', 'ahj', 'project_type', 'scope'], humanGated: false },
+    { trigger: 'Contract approved & deposit gate', from: 'Sales OS', to: 'GCagent.ai', payload: ['contract_value', 'deposit_required', 'job_handoff'], humanGated: true },
+    { trigger: 'Discount / margin override requested', from: 'Sales OS', to: 'Cyborg.ai', payload: ['rep', 'amount', 'margin_impact'], humanGated: true },
+    { trigger: 'Every routing & scoring decision', from: 'Sales OS', to: 'Cyborg.ai', payload: ['decision', 'actor', 'truth_tag', 'audit_hash'], humanGated: false },
+  ],
 });
 
 // ---------------------------------------------------------------------------

@@ -261,8 +261,54 @@ export interface SalesReadiness {
   nextMilestone: string;
 }
 
-export interface SalesIntelligence {
+export type DataProvenance = 'SIMULATED' | 'BLENDED' | 'ACTUAL';
+
+export interface SalesCapture {
+  provenance: DataProvenance;
+  monthsOfRealData: number;
+  capturedOpportunities: number;
+  capturedCompletions: number;
+  realDataWeight: number; // 0..1
+  blockingGaps: string[];
+  nextAction: string;
+}
+
+export interface CloseRateLever {
+  key: string;
+  name: string;
+  owner: string;
+  lift: number; // relative, e.g. 0.18
+  runningRate: number; // 0..1
+}
+
+export interface CloseRateLoop {
+  baselineLow: number; // 0..1
+  baselineHigh: number; // 0..1
+  current: number; // 0..1
+  projected: number; // 0..1
+  ceiling: number; // 0..1
+  levers: CloseRateLever[];
+}
+
+export interface SalesGovernanceRow {
+  action: string;
+  gate: 'auto' | 'human';
   truthTag: 'LIVE' | 'STAGED' | 'SIMULATED' | 'BLOCKED';
+  rationale: string;
+}
+
+export interface SalesHandoff {
+  trigger: string;
+  from: string;
+  to: string;
+  payload: string[];
+  humanGated: boolean;
+}
+
+export interface SalesIntelligence {
+  version: string;
+  truthTag: 'LIVE' | 'STAGED' | 'SIMULATED' | 'BLOCKED';
+  provenance: DataProvenance;
   label: string;
   neededNext: string;
   decisionAuthority: string;
@@ -280,6 +326,10 @@ export interface SalesIntelligence {
   routing: SalesRouting;
   markets: SalesMarketRow[];
   readiness: SalesReadiness;
+  capture: SalesCapture;
+  closeRate: CloseRateLoop;
+  governance: SalesGovernanceRow[];
+  collaboration: SalesHandoff[];
 }
 
 export interface DashboardOverview {

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from backend.sales.collaboration import collaboration_map
+from backend.sales.governance import governance_matrix
 from backend.sales.hierarchy import RevenueTier, lines_in_tier
 from backend.sales.lead_routing import LeadGrade
 from backend.sales.simulation import MARKETS, SalesSimulation
@@ -118,8 +120,10 @@ def aggregate(sim: SalesSimulation) -> dict[str, object]:
     standard = sim.routing.standard_count
 
     return {
+        "version": "2.1",
         "truth_tag": sim.truth_tag.value,
-        "label": "SIMULATED MODEL OUTPUT",
+        "provenance": sim.provenance.value,
+        "label": f"{sim.provenance.value} MODEL OUTPUT",
         "headline": {
             "gross_profit": round(total_gross_profit, 2),
             "revenue": round(total_revenue, 2),
@@ -138,4 +142,8 @@ def aggregate(sim: SalesSimulation) -> dict[str, object]:
         "metric_groups": metric_groups(),
         "hierarchy": hierarchy_view(),
         "readiness": sim.readiness.to_dict(),
+        "capture": sim.capture.to_dict(),
+        "close_rate": sim.close_rate.to_dict(),
+        "governance": governance_matrix(),
+        "collaboration": collaboration_map(),
     }

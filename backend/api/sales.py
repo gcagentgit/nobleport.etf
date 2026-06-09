@@ -14,9 +14,15 @@ from fastapi import APIRouter, Query
 from backend.sales import (
     GPPI_WEIGHTS,
     REVENUE_HIERARCHY,
+    SalesAction,
     aggregate,
+    classify_action,
+    collaboration_map,
+    enrich_lead,
+    governance_matrix,
     hierarchy_view,
     metric_groups,
+    project_close_rate,
     run_simulation,
 )
 
@@ -84,13 +90,17 @@ async def get_simulation(
     team_size: int = Query(8, ge=1, le=12),
     lead_count: int = Query(40, ge=0, le=500),
     months_of_real_data: float = Query(0.0, ge=0.0),
+    captured_opportunities: int = Query(0, ge=0),
+    captured_completions: int = Query(0, ge=0),
     seed: int = Query(42, ge=0),
 ):
-    """A full SIMULATED sales snapshot: leaderboard + routing + data-readiness gate."""
+    """A full sales snapshot: leaderboard + routing + provenance + close-rate loop."""
     sim = run_simulation(
         team_size=team_size,
         lead_count=lead_count,
         months_of_real_data=months_of_real_data,
+        captured_opportunities=captured_opportunities,
+        captured_completions=captured_completions,
         seed=seed,
     )
     return sim.to_dict()
@@ -101,13 +111,58 @@ async def get_dashboard(
     team_size: int = Query(8, ge=1, le=12),
     lead_count: int = Query(40, ge=0, le=500),
     months_of_real_data: float = Query(0.0, ge=0.0),
+    captured_opportunities: int = Query(0, ge=0),
+    captured_completions: int = Query(0, ge=0),
     seed: int = Query(42, ge=0),
 ):
-    """The aggregated v1 sales dashboard payload over a SIMULATED snapshot."""
+    """The aggregated Revenue War Board payload over a sales snapshot."""
     sim = run_simulation(
         team_size=team_size,
         lead_count=lead_count,
         months_of_real_data=months_of_real_data,
+        captured_opportunities=captured_opportunities,
+        captured_completions=captured_completions,
         seed=seed,
     )
     return aggregate(sim)
+
+
+# =========================================================================
+# v2.1 — Progressive Revenue Execution Layer
+# =========================================================================
+
+
+@router.get("/close-rate")
+async def get_close_rate(current: float | None = Query(None, ge=0.0, le=1.0)):
+    """The close-rate growth loop from NoblePort's ~6.25%–12.5% baseline."""
+    return project_close_rate(current=current).to_dict()
+
+
+@router.get("/governance")
+async def get_governance():
+    """The human-gated sales authority matrix (AUTO vs HUMAN per action)."""
+    return {"matrix": governance_matrix()}
+
+
+@router.get("/governance/classify")
+async def classify_sales_action(
+    action: str = Query(..., description="A SalesAction key, e.g. apply_discount"),
+    amount_usd: float = Query(0.0, ge=0.0),
+):
+    """Classify a single sales action into AUTO/HUMAN with its Truth-Layer tag."""
+    return classify_action(action, amount_usd=amount_usd).to_dict()
+
+
+@router.get("/collaboration")
+async def get_collaboration():
+    """The Stephanie / PermitStream / GCagent / Cyborg handoff map."""
+    return {"handoffs": collaboration_map()}
+
+
+@router.get("/enrichment")
+async def get_enrichment(
+    service_line: str = Query(..., description="A hierarchy key, e.g. investor_redevelopment"),
+    estimated_value: float = Query(0.0, ge=0.0),
+):
+    """Tax-aware real-estate talking points — advisory only, CPA review required."""
+    return enrich_lead(service_line, estimated_value=estimated_value).to_dict()
