@@ -27,8 +27,13 @@ from backend.agents.stephanie_policy import (
 from backend.agents.truth_registry import (
     CONTROL_RULE,
     FLYWHEELS,
+    OVERALL_PLATFORM_COMPLETION,
+    SUPERSEDED_COMPLETION_FIGURES,
+    VOICE_LAUNCH_GATES,
+    EvidenceTag,
     TruthLabel,
     label_claim,
+    normalize_claim,
     reconcile,
     registry_snapshot,
 )
@@ -258,6 +263,50 @@ def test_registry_snapshot_has_control_rule_and_twelve_flywheels():
     assert "not an autonomous executive signer" in CONTROL_RULE
     assert len(FLYWHEELS) == 12
     assert snap["power_center"] == "construction operations"
+
+
+def test_blocked_label_reconciles_as_more_honest():
+    # A STAGED claim observed as BLOCKED resolves to BLOCKED (the weaker truth).
+    assert reconcile(TruthLabel.STAGED, TruthLabel.BLOCKED) == TruthLabel.BLOCKED
+    assert reconcile(TruthLabel.LIVE, TruthLabel.BLOCKED) == TruthLabel.BLOCKED
+
+
+def test_one_locked_completion_number():
+    # Report P0 #1: exactly one figure (46%), with 48% explicitly superseded.
+    snap = registry_snapshot()
+    assert snap["overall_platform_completion"] == 46
+    assert OVERALL_PLATFORM_COMPLETION == 46
+    assert 48 in SUPERSEDED_COMPLETION_FIGURES
+
+
+def test_voice_gates_zero_of_four_clear():
+    snap = registry_snapshot()
+    assert snap["voice_gates_total"] == 4
+    assert snap["voice_gates_clear"] == 0
+    assert all(g.status != "passing" for g in VOICE_LAUNCH_GATES)
+
+
+def test_risky_claims_are_normalized_to_compliant_language():
+    # Report P0 #3: licensing/credential claims rewritten + human-gated.
+    s7 = normalize_claim("Series 7 Framework")
+    assert s7 is not None
+    assert "not licensed financial advice" in s7.safe
+    assert s7.evidence == EvidenceTag.HUMAN_GATED
+
+    avatar = normalize_claim("1 Billion avatar deployment")
+    assert avatar.safe == "future-state avatar deployment architecture"
+    assert avatar.evidence == EvidenceTag.SIMULATED
+
+    assert normalize_claim("a perfectly fine claim") is None
+
+
+def test_every_platform_module_carries_a_tier_badge():
+    snap = registry_snapshot()
+    tiered = {c["name"]: c["tier"] for c in snap["components"] if c["tier"]}
+    assert tiered["Stephanie.ai core orchestrator"] == "LAUNCH-CRITICAL"
+    assert tiered["GCagent.ai compliance monitor"] == "PHASE 2"
+    assert tiered["Cyborg.ai identity layer"] == "PHASE 3"
+    assert tiered["Discord Mission Control"] == "DEFERRED"
 
 
 # --------------------------------------------------------------------------- #

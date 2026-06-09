@@ -35,22 +35,42 @@ CONTROL_RULE = (
 
 
 class TruthLabel(StrEnum):
-    """Honest status of a capability. Labels only move up with evidence."""
+    """
+    Operational/deployment state of a capability. Labels only move up with
+    evidence. Vocabulary aligned with the Notion Command Center truth layer.
+    """
     LIVE = "live"            # in production on real jobs/data
-    STAGED = "staged"        # built but behind production/test/audit gates
-    SIMULATED = "simulated"  # works in simulation only
+    STAGED = "staged"        # built/demoable but not production-proven
+    SIMULATED = "simulated"  # works on sample/demo data only
+    BLOCKED = "blocked"      # waiting on an upstream dependency / failing gate
     TARGET = "target"        # roadmap intent, not yet built
     PENDING = "pending"      # blocked on an external gate (audit, legal, mainnet)
 
 
-# Ordering for truth-labeling logic (higher = stronger claim).
+# Ordering for truth-labeling logic (higher = stronger claim). BLOCKED ranks
+# low: an active blocker is one of the most honest "not done" signals.
 _LABEL_RANK: dict[TruthLabel, int] = {
     TruthLabel.TARGET: 0,
-    TruthLabel.SIMULATED: 1,
-    TruthLabel.PENDING: 2,
-    TruthLabel.STAGED: 3,
-    TruthLabel.LIVE: 4,
+    TruthLabel.BLOCKED: 1,
+    TruthLabel.SIMULATED: 2,
+    TruthLabel.PENDING: 3,
+    TruthLabel.STAGED: 4,
+    TruthLabel.LIVE: 5,
 }
+
+
+class EvidenceTag(StrEnum):
+    """
+    Credibility of a *number or claim*, orthogonal to deployment state. This is
+    the discipline the optimization report demands: a polished dashboard must
+    not render management estimates, technical claims, and future-state in the
+    same visual language. Every datum carries one of these.
+    """
+    VERIFIED = "verified"        # evidence exists (export, log, third party)
+    MGMT_EST = "mgmt_est"        # management estimate only
+    SIMULATED = "simulated"      # sample/demo data
+    BLOCKED = "blocked"          # waiting on upstream dependency
+    HUMAN_GATED = "human_gated"  # cannot execute without Michael/licensed approval
 
 
 class ComponentStatus(BaseModel):
@@ -58,6 +78,10 @@ class ComponentStatus(BaseModel):
     name: str
     label: TruthLabel
     completion_pct: int | None = None
+    tier: str | None = None
+    # Default MGMT_EST: per the optimization report, the whole status picture
+    # is a management estimate until receipts (exports, CPA review) exist.
+    evidence: EvidenceTag = EvidenceTag.MGMT_EST
     ground_truth: str = ""
 
 
@@ -86,7 +110,8 @@ COMPONENT_STATUS: list[ComponentStatus] = [
     ),
     ComponentStatus(
         name="Stephanie.ai core orchestrator", label=TruthLabel.STAGED, completion_pct=81,
-        ground_truth="Voice gating and production deployment incomplete.",
+        tier="LAUNCH-CRITICAL",
+        ground_truth="Closest to a usable demo state; voice gates 0/4 — NOT launch-ready. Demo must be labelled STAGED.",
     ),
     ComponentStatus(
         name="KUZO swap layer", label=TruthLabel.STAGED, completion_pct=None,
@@ -94,15 +119,23 @@ COMPONENT_STATUS: list[ComponentStatus] = [
     ),
     ComponentStatus(
         name="GCagent.ai compliance monitor", label=TruthLabel.STAGED, completion_pct=44,
-        ground_truth="Connector integrations pending.",
+        tier="PHASE 2",
+        ground_truth="Solid Phase 2 base; ERPNext integration only ~10%.",
     ),
     ComponentStatus(
         name="PermitStream.ai", label=TruthLabel.STAGED, completion_pct=38,
-        ground_truth="Regional permit connectors incomplete; manual fallback still required.",
+        tier="PHASE 2",
+        ground_truth="Workflow direction is right; municipal connectors are the weak point.",
     ),
     ComponentStatus(
         name="Cyborg.ai identity layer", label=TruthLabel.STAGED, completion_pct=28,
-        ground_truth="Identity/signing architecture not live.",
+        tier="PHASE 3",
+        ground_truth="Web3 layer staged; HSM signing (~10%) is the major blocker.",
+    ),
+    ComponentStatus(
+        name="Discord Mission Control", label=TruthLabel.TARGET, completion_pct=8,
+        tier="DEFERRED",
+        ground_truth="Properly deferred — do not spend cycles here yet.",
     ),
     ComponentStatus(
         name="NBPT token contracts", label=TruthLabel.STAGED, completion_pct=None,
@@ -113,6 +146,104 @@ COMPONENT_STATUS: list[ComponentStatus] = [
         ground_truth="TTS/lip-sync integrated in development; production load validation incomplete.",
     ),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Locked headline numbers (optimization report P0 #1: ONE completion number)
+# ---------------------------------------------------------------------------
+
+# The dashboard showed both 48% (header chip) and 46% (platform section).
+# 46% is the locked figure; 48% is superseded to remove the conflict.
+OVERALL_PLATFORM_COMPLETION = 46
+SUPERSEDED_COMPLETION_FIGURES = [48]
+PLATFORM_ARR = 0  # pre-revenue / staged — never frame as traction
+PLATFORM_NARRATIVE = "pre-Series A preparation / strategic seed narrative"
+
+
+class Gate(BaseModel):
+    """A pass/fail launch or readiness gate with its evidence state."""
+    name: str
+    target: str
+    current: str
+    status: str  # failing | in_progress | pending | passing
+    evidence: EvidenceTag = EvidenceTag.MGMT_EST
+
+
+# Voice-stack launch gates — 0/4 clear. Stephanie is NOT launch-ready until
+# these pass; the demo may proceed but must be labelled STAGED.
+VOICE_LAUNCH_GATES: list[Gate] = [
+    Gate(name="Waveform P95 latency", target="<90ms (interim <130ms)", current="~147ms", status="failing"),
+    Gate(name="Caption drift P95", target="<2.0s (interim <2.5s)", current="~3.1s", status="failing"),
+    Gate(name="LiveKit room stability", target="Pass", current="In testing", status="in_progress"),
+    Gate(name="100-session load test", target="Pass", current="Not run (run 25→50→100)", status="pending"),
+]
+
+# Series A readiness — the missing items are evidence (receipts), not UI.
+SERIES_A_GAPS: dict[str, str] = {
+    "Financial Hygiene": "ERPNext reconciliation, CPA-reviewed financials, separate GC vs platform P&L",
+    "Platform Revenue": "First paying Stephanie.ai customers, municipal pilot, ARR proof",
+    "Technical Benchmarks": "Voice latency CSV exports, uptime report, anchor tx export, attestation pass/fail rate",
+    "Data Room": "Financials, cap table, live benchmarks, customer contracts, pilot agreements",
+}
+
+
+# ---------------------------------------------------------------------------
+# Risky-claim normalization (optimization report P0 #3)
+# ---------------------------------------------------------------------------
+
+class ClaimNormalization(BaseModel):
+    """A risky claim and its compliant rewrite + credibility tag."""
+    risky: str
+    safe: str
+    evidence: EvidenceTag
+
+
+# Single source of truth for compliant claim language. Any surface (dashboard,
+# deck, Notion) should render `safe`, never `risky`.
+CLAIM_NORMALIZATIONS: list[ClaimNormalization] = [
+    ClaimNormalization(
+        risky="Series 7 Framework",
+        safe="securities-analysis workflow framework; not licensed financial advice",
+        evidence=EvidenceTag.HUMAN_GATED,
+    ),
+    ClaimNormalization(
+        risky="Series 63 Framework",
+        safe="state blue-sky compliance workflow framework; not licensed financial advice",
+        evidence=EvidenceTag.HUMAN_GATED,
+    ),
+    ClaimNormalization(
+        risky="CCIM Framework",
+        safe="commercial real-estate investment-analysis framework; no human credential implied",
+        evidence=EvidenceTag.MGMT_EST,
+    ),
+    ClaimNormalization(
+        risky="1 Billion avatar deployment",
+        safe="future-state avatar deployment architecture",
+        evidence=EvidenceTag.SIMULATED,
+    ),
+    ClaimNormalization(
+        risky="~3,000+ live validators",
+        safe="distributed-node architecture (validator count unverified from chain data)",
+        evidence=EvidenceTag.MGMT_EST,
+    ),
+    ClaimNormalization(
+        risky="~82k holders and voters",
+        safe="holder/voter governance architecture (count unverified from chain data)",
+        evidence=EvidenceTag.MGMT_EST,
+    ),
+    ClaimNormalization(
+        risky="~131,000 IQCore compute baseline",
+        safe="benchmarked compute throughput (management estimate; CSV export pending)",
+        evidence=EvidenceTag.MGMT_EST,
+    ),
+]
+
+_CLAIM_INDEX = {c.risky.lower(): c for c in CLAIM_NORMALIZATIONS}
+
+
+def normalize_claim(text: str) -> ClaimNormalization | None:
+    """Return the compliant rewrite for a known risky claim, if any."""
+    return _CLAIM_INDEX.get(text.strip().lower())
 
 
 # ---------------------------------------------------------------------------
@@ -200,10 +331,19 @@ def registry_snapshot() -> dict:
     """Full machine-readable truth layer for Mission Control / the API."""
     return {
         "control_rule": CONTROL_RULE,
+        "overall_platform_completion": OVERALL_PLATFORM_COMPLETION,
+        "superseded_completion_figures": SUPERSEDED_COMPLETION_FIGURES,
+        "platform_arr": PLATFORM_ARR,
+        "platform_narrative": PLATFORM_NARRATIVE,
         "power_center": "construction operations",
         "next_unlock": "PermitStream + GCagent integration",
         "future_upside": "governance, tokenization, voice/avatar distribution",
+        "voice_gates_clear": sum(1 for g in VOICE_LAUNCH_GATES if g.status == "passing"),
+        "voice_gates_total": len(VOICE_LAUNCH_GATES),
         "components": [c.model_dump() for c in COMPONENT_STATUS],
+        "voice_launch_gates": [g.model_dump() for g in VOICE_LAUNCH_GATES],
+        "series_a_gaps": SERIES_A_GAPS,
+        "claim_normalizations": [c.model_dump() for c in CLAIM_NORMALIZATIONS],
         "flywheels": [f.model_dump() for f in FLYWHEELS],
         "priority_phases": PRIORITY_PHASES,
     }
