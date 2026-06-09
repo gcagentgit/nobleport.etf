@@ -39,6 +39,16 @@ class RiskTier(StrEnum):
     HIGH = "high"      # always requires human approval
 
 
+class LockState(StrEnum):
+    """
+    Lifecycle of an applied policy generation under the Monitor → Lock /
+    Rollback stage of the controlled loop.
+    """
+    LOCKED = "locked"          # proven / baseline — the stable in-force policy
+    PROVISIONAL = "provisional"  # applied, but not yet proven on fresh outcomes
+    ROLLED_BACK = "rolled_back"  # superseded by a rollback after it regressed
+
+
 class ParameterSpec(BaseModel):
     """Safe-range definition for a single tunable parameter."""
     name: str
@@ -209,6 +219,7 @@ class PolicyVersion(BaseModel):
     parent_generation: int | None
     policy: StephaniePolicy
     objective_score: float
+    lock_state: LockState = LockState.PROVISIONAL
     rationale: str = ""
     created_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()

@@ -11,6 +11,7 @@ from __future__ import annotations
 from backend.agents.self_improvement import (
     DEFAULT_FAST_TRACK_COST,
     CircuitBreaker,
+    ControlMode,
     Decision,
     DecisionOutcome,
     RecursiveSelfImprovementEngine,
@@ -19,8 +20,17 @@ from backend.agents.self_improvement import (
 )
 from backend.agents.stephanie_policy import (
     PARAMETER_SPECS,
+    LockState,
     RiskTier,
     StephaniePolicy,
+)
+from backend.agents.truth_registry import (
+    CONTROL_RULE,
+    FLYWHEELS,
+    TruthLabel,
+    label_claim,
+    reconcile,
+    registry_snapshot,
 )
 
 
@@ -39,6 +49,19 @@ def _converted_midmarket_leads(n: int = 10, value: float = 80_000.0) -> list[Dec
             features={"estimated_value": value, "source": "web", "property_address": None},
             converted=True,
             won_value=value,
+        )
+        for i in range(n)
+    ]
+
+
+def _lost_midmarket_leads(n: int = 10, value: float = 80_000.0) -> list[DecisionOutcome]:
+    """Mid-market leads that did NOT convert — fast-tracking them wastes spend."""
+    return [
+        DecisionOutcome(
+            lead_id=f"X{i}",
+            features={"estimated_value": value, "source": "web", "property_address": None},
+            converted=False,
+            won_value=0.0,
         )
         for i in range(n)
     ]
@@ -122,19 +145,119 @@ def test_run_cycle_dry_run_does_not_apply_high_risk():
 # --------------------------------------------------------------------------- #
 # LOW-risk change with a custom objective auto-applies
 # --------------------------------------------------------------------------- #
-def test_low_risk_change_auto_applies():
-    # Objective rewards a LOW-risk parameter (lower stale_lead_days), scaled
-    # above MIN_IMPROVEMENT so the move qualifies.
-    def obj(_outcomes, policy: StephaniePolicy) -> float:
-        return -1_000.0 * policy.stale_lead_days
+def _low_risk_objective(_outcomes, policy: StephaniePolicy) -> float:
+    """Rewards a LOW-risk parameter (lower stale_lead_days), scaled above MIN_IMPROVEMENT."""
+    return -1_000.0 * policy.stale_lead_days
 
-    engine = RecursiveSelfImprovementEngine(objective=obj)
+
+def test_low_risk_change_auto_applies_only_in_operational_mode():
+    # OPERATIONAL_AUTO is the explicit opt-in that allows LOW-risk auto-apply.
+    engine = RecursiveSelfImprovementEngine(
+        objective=_low_risk_objective, control_mode=ControlMode.OPERATIONAL_AUTO,
+    )
     engine.record_outcomes([DecisionOutcome(lead_id="x")])  # non-empty window
     report = engine.run_cycle(auto_apply=True)
 
     assert report.applied is True
     assert engine.generation == 1
     assert engine.current.stale_lead_days < StephaniePolicy().stale_lead_days
+
+
+# --------------------------------------------------------------------------- #
+# Control rule: fail-closed is the default; the loop only recommends
+# --------------------------------------------------------------------------- #
+def test_fail_closed_is_the_default():
+    engine = RecursiveSelfImprovementEngine()
+    assert engine.control_mode == ControlMode.FAIL_CLOSED
+
+
+def test_fail_closed_blocks_low_risk_auto_apply():
+    # Same LOW-risk improvement, but default FAIL_CLOSED mode must NOT deploy.
+    engine = RecursiveSelfImprovementEngine(objective=_low_risk_objective)
+    engine.record_outcomes([DecisionOutcome(lead_id="x")])
+    report = engine.run_cycle(auto_apply=True)
+
+    assert report.applied is False
+    assert report.proposal.decision == Decision.NEEDS_HUMAN
+    assert engine.generation == 0
+
+
+# --------------------------------------------------------------------------- #
+# Diagnose stage
+# --------------------------------------------------------------------------- #
+def test_proposal_carries_diagnosis_of_missed_conversions():
+    engine = RecursiveSelfImprovementEngine()
+    engine.record_outcomes(_converted_midmarket_leads(n=10, value=80_000.0))
+    proposal = engine.propose()
+
+    assert proposal.diagnosis is not None
+    assert proposal.diagnosis.missed_conversions == 10
+    assert proposal.diagnosis.value_left_on_table == 800_000.0
+
+
+# --------------------------------------------------------------------------- #
+# Monitor -> Lock / Rollback
+# --------------------------------------------------------------------------- #
+def test_applied_generation_is_provisional_until_verified():
+    engine = RecursiveSelfImprovementEngine()
+    engine.record_outcomes(_converted_midmarket_leads())
+    engine.approve(engine.propose().id, approved_by="operator")
+    assert engine.history[-1].lock_state == LockState.PROVISIONAL
+
+
+def test_verify_locks_change_that_holds_up():
+    engine = RecursiveSelfImprovementEngine()
+    engine.record_outcomes(_converted_midmarket_leads())
+    engine.approve(engine.propose().id, approved_by="operator")
+
+    report = engine.verify()  # same window the change won on => holds
+    assert report.held_up is True
+    assert report.locked is True
+    assert engine.history[-1].lock_state == LockState.LOCKED
+
+
+def test_verify_rolls_back_change_that_regresses_on_fresh_outcomes():
+    engine = RecursiveSelfImprovementEngine()
+    engine.record_outcomes(_converted_midmarket_leads())
+    proposal = engine.propose()
+    engine.approve(proposal.id, approved_by="operator")
+    lowered = engine.current.high_value_threshold
+    assert lowered < 100_000.0
+
+    # Fresh reality: those mid-market leads do NOT convert -> fast-tracking wastes spend.
+    report = engine.verify(_lost_midmarket_leads())
+    assert report.held_up is False
+    assert report.rolled_back_to == 0
+    assert engine.current.high_value_threshold == 100_000.0  # restored
+
+
+def test_repeated_verification_regressions_trip_breaker():
+    engine = RecursiveSelfImprovementEngine(breaker=CircuitBreaker(threshold=2))
+    # Two independent provisional changes that each regress on fresh outcomes.
+    for _ in range(2):
+        engine.record_outcomes(_converted_midmarket_leads())
+        engine.approve(engine.propose().id, approved_by="operator")
+        engine.verify(_lost_midmarket_leads())
+    assert engine.breaker.open is True
+
+
+# --------------------------------------------------------------------------- #
+# Truth registry / truth-labeling skill
+# --------------------------------------------------------------------------- #
+def test_truth_labeling_downgrades_unproven_live_claims():
+    assert label_claim(TruthLabel.LIVE, has_evidence=False) == TruthLabel.STAGED
+    assert label_claim(TruthLabel.LIVE, has_evidence=True) == TruthLabel.LIVE
+    # Reconcile takes the weaker (more honest) of claimed vs observed.
+    assert reconcile(TruthLabel.LIVE, TruthLabel.STAGED) == TruthLabel.STAGED
+    assert reconcile(TruthLabel.STAGED, TruthLabel.LIVE) == TruthLabel.STAGED
+
+
+def test_registry_snapshot_has_control_rule_and_twelve_flywheels():
+    snap = registry_snapshot()
+    assert snap["control_rule"] == CONTROL_RULE
+    assert "not an autonomous executive signer" in CONTROL_RULE
+    assert len(FLYWHEELS) == 12
+    assert snap["power_center"] == "construction operations"
 
 
 # --------------------------------------------------------------------------- #

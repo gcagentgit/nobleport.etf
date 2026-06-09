@@ -24,7 +24,8 @@ from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
-from backend.agents.self_improvement import RecursiveSelfImprovementEngine
+from backend.agents.self_improvement import ControlMode, RecursiveSelfImprovementEngine
+from backend.agents.truth_registry import CONTROL_RULE, registry_snapshot
 
 router = APIRouter()
 
@@ -54,12 +55,34 @@ async def _audit(request: Request, action: str, detail: dict[str, Any], actor: s
     })
 
 
+@router.get("/control-rule")
+async def get_control_rule(request: Request) -> dict[str, Any]:
+    """
+    The operating model: AI observes -> drafts -> scores -> recommends ->
+    human approves -> system logs -> system learns. Surfaces the live control
+    mode so the UI can show whether the loop is fail-closed (human-gated).
+    """
+    engine = _engine(request)
+    return {
+        "control_rule": CONTROL_RULE,
+        "control_mode": engine.control_mode.value,
+        "fail_closed": engine.control_mode == ControlMode.FAIL_CLOSED,
+    }
+
+
+@router.get("/truth")
+async def get_truth_registry() -> dict[str, Any]:
+    """The honest truth layer — component statuses, flywheels, priority phases."""
+    return registry_snapshot()
+
+
 @router.get("/policy")
 async def get_policy(request: Request) -> dict[str, Any]:
     """Current tuned decision policy and generation number."""
     engine = _engine(request)
     return {
         "generation": engine.generation,
+        "control_mode": engine.control_mode.value,
         "policy": engine.current.model_dump(),
         "objective_score": engine.score(engine.current) if engine.outcomes else None,
     }
@@ -171,6 +194,49 @@ async def rollback(
         "restored_generation": generation, "new_generation": version.generation, "actor": actor,
     }, actor=actor)
     return {"rolled_back_to": generation, "version": version.model_dump()}
+
+
+@router.post("/verify")
+async def verify(
+    request: Request,
+    actor: str = Body("operator", embed=True),
+) -> dict[str, Any]:
+    """
+    Monitor -> Lock / Rollback. Prove the provisional in-force generation
+    still beats its parent on the latest outcomes: lock it if it holds,
+    auto-roll back if it regressed.
+    """
+    engine = _engine(request)
+    report = engine.verify()
+    await _audit(request, "verify", {
+        "generation": report.generation,
+        "held_up": report.held_up,
+        "locked": report.locked,
+        "rolled_back_to": report.rolled_back_to,
+    }, actor=actor)
+    return report.model_dump()
+
+
+@router.post("/control-mode")
+async def set_control_mode(
+    request: Request,
+    mode: str = Body(..., embed=True, description="fail_closed | operational_auto"),
+    actor: str = Body("operator", embed=True),
+) -> dict[str, Any]:
+    """
+    Switch the control mode. FAIL_CLOSED (default) keeps every change
+    human-gated; OPERATIONAL_AUTO is an explicit, audited opt-in that lets
+    LOW-risk operational tuning auto-apply. Recorded on the audit chain.
+    """
+    engine = _engine(request)
+    try:
+        engine.control_mode = ControlMode(mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Unknown control mode: {mode}") from exc
+    await _audit(request, "control_mode_change", {
+        "mode": engine.control_mode.value, "actor": actor, "generation": engine.generation,
+    }, actor=actor)
+    return {"control_mode": engine.control_mode.value}
 
 
 @router.post("/breaker/reset")

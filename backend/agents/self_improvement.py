@@ -45,6 +45,7 @@ from pydantic import BaseModel, Field
 
 from backend.agents.stephanie_policy import (
     PARAMETER_SPECS,
+    LockState,
     PolicyVersion,
     RiskTier,
     StephaniePolicy,
@@ -141,10 +142,37 @@ ObjectiveFn = Callable[[Iterable[DecisionOutcome], StephaniePolicy], float]
 # Proposals & reports
 # ---------------------------------------------------------------------------
 
+class ControlMode(StrEnum):
+    """
+    Governs whether the loop may ever deploy a change on its own.
+
+    Per the Stephanie.ai control rule — *AI observes → drafts → scores →
+    recommends → authorized human approves → system logs → system learns* —
+    the safe default is FAIL_CLOSED: the loop only ever recommends, and a
+    human approves every deploy. OPERATIONAL_AUTO is an explicit, opt-in
+    relaxation that allows LOW-risk *operational* tuning (e.g. ops-brief
+    severity cutoffs) to auto-apply. It never relaxes MEDIUM/HIGH gating.
+    """
+    FAIL_CLOSED = "fail_closed"          # default deny — human approves every change
+    OPERATIONAL_AUTO = "operational_auto"  # LOW-risk operational tuning may auto-apply
+
+
 class Decision(StrEnum):
     AUTO_APPLY = "auto_apply"
     NEEDS_HUMAN = "needs_human"
     REJECTED = "rejected"
+
+
+class Diagnosis(BaseModel):
+    """
+    The 'Diagnose' stage: why the current policy under-performed, in plain
+    language, with the evidence that motivates the proposed change.
+    """
+    summary: str = ""
+    missed_conversions: int = 0
+    value_left_on_table: float = 0.0
+    over_prioritized: int = 0
+    details: list[str] = Field(default_factory=list)
 
 
 class ImprovementProposal(BaseModel):
@@ -159,6 +187,7 @@ class ImprovementProposal(BaseModel):
     confidence: float = 0.0
     risk_tier: RiskTier = RiskTier.LOW
     decision: Decision = Decision.NEEDS_HUMAN
+    diagnosis: Diagnosis | None = None
     rationale: str = ""
     created_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
@@ -169,9 +198,21 @@ class GenerationReport(BaseModel):
     """Outcome of one ``run_cycle`` invocation."""
     generation: int
     sample_size: int
+    control_mode: ControlMode = ControlMode.FAIL_CLOSED
+    stages: list[str] = Field(default_factory=list)
     proposal: ImprovementProposal | None = None
     applied: bool = False
     breaker_open: bool = False
+    note: str = ""
+
+
+class VerificationReport(BaseModel):
+    """Outcome of the Monitor → Lock / Rollback stage on a provisional change."""
+    generation: int
+    held_up: bool
+    verification_score: float
+    locked: bool = False
+    rolled_back_to: int | None = None
     note: str = ""
 
 
@@ -234,10 +275,13 @@ class RecursiveSelfImprovementEngine:
         objective: ObjectiveFn = intake_objective,
         audit_sink: Callable[[str, dict[str, Any]], None] | None = None,
         breaker: CircuitBreaker | None = None,
+        control_mode: ControlMode = ControlMode.FAIL_CLOSED,
     ) -> None:
         self.objective = objective
         self._audit_sink = audit_sink
         self.breaker = breaker or CircuitBreaker()
+        # Fail-closed by default: the loop recommends, a human approves deploys.
+        self.control_mode = control_mode
 
         base = policy or StephaniePolicy()
         self.current = base
@@ -248,6 +292,7 @@ class RecursiveSelfImprovementEngine:
                 parent_generation=None,
                 policy=base,
                 objective_score=0.0,
+                lock_state=LockState.LOCKED,
                 rationale="Baseline policy (shipped defaults).",
             )
         ]
@@ -337,6 +382,7 @@ class RecursiveSelfImprovementEngine:
                 f"+{improvement:g} objective over {len(self.outcomes)} outcomes."
             ),
         )
+        proposal.diagnosis = self.diagnose()
         proposal.decision = self._govern(proposal)
         self.pending[proposal.id] = proposal
         self._audit("self_improvement.propose", proposal.model_dump())
@@ -348,10 +394,53 @@ class RecursiveSelfImprovementEngine:
         denom = abs(baseline) + abs(improvement) + 1.0
         return round(min(1.0, abs(improvement) / denom), 3)
 
+    # -- diagnose ------------------------------------------------------------
+
+    def diagnose(self) -> Diagnosis:
+        """
+        Explain why the current policy under-performs, with evidence — the
+        'Compare' + 'Diagnose' stages of the controlled loop. Looks at
+        converted leads the current policy did NOT fast-track (revenue left on
+        the table) and fast-tracked leads that never converted (wasted spend).
+        """
+        missed = 0
+        left_on_table = 0.0
+        over = 0
+        for o in self.outcomes:
+            prioritized = classify_priority(o.features, self.current) == "high"
+            if o.converted and not prioritized:
+                missed += 1
+                left_on_table += o.won_value
+            elif prioritized and not o.converted:
+                over += 1
+        details: list[str] = []
+        if missed:
+            details.append(
+                f"{missed} converted lead(s) were not fast-tracked "
+                f"(~${left_on_table:,.0f} of won value under-served)."
+            )
+        if over:
+            details.append(f"{over} fast-tracked lead(s) did not convert (wasted prioritization spend).")
+        if not details:
+            details.append("No systematic misroutes detected in the current window.")
+        return Diagnosis(
+            summary="; ".join(details),
+            missed_conversions=missed,
+            value_left_on_table=round(left_on_table, 2),
+            over_prioritized=over,
+            details=details,
+        )
+
     # -- govern --------------------------------------------------------------
 
     def _govern(self, proposal: ImprovementProposal) -> Decision:
-        """Decide auto-apply vs human approval from risk tier + breaker."""
+        """
+        Decide auto-apply vs human approval from control mode, risk tier, and
+        breaker. FAIL_CLOSED (the default) routes EVERY change to a human —
+        the loop recommends, it never deploys on its own.
+        """
+        if self.control_mode == ControlMode.FAIL_CLOSED:
+            return Decision.NEEDS_HUMAN
         if self.breaker.open:
             return Decision.NEEDS_HUMAN
         tier = proposal.risk_tier
@@ -380,13 +469,11 @@ class RecursiveSelfImprovementEngine:
             parent_generation=parent,
             policy=new_policy,
             objective_score=proposal.candidate_score,
+            lock_state=LockState.PROVISIONAL,  # proven only after verify()
             rationale=proposal.rationale,
         )
         self.history.append(version)
         self.pending.pop(proposal.id, None)
-
-        # Breaker tracks whether applied changes keep improving.
-        self.breaker.record(improved=proposal.improvement > 0)
 
         self._audit("self_improvement.apply", {
             "generation": self.generation,
@@ -394,6 +481,7 @@ class RecursiveSelfImprovementEngine:
             "changes": proposal.changes,
             "approved_by": approved_by,
             "objective_score": proposal.candidate_score,
+            "lock_state": version.lock_state.value,
         })
         logger.info(
             "Stephanie self-improvement: generation %d applied (%s) by %s",
@@ -416,8 +504,16 @@ class RecursiveSelfImprovementEngine:
             "proposal_id": proposal_id, "rejected_by": rejected_by, "reason": reason,
         })
 
-    def rollback(self, generation: int, *, actor: str = "human") -> PolicyVersion:
-        """Restore a prior generation's policy (recorded as a new version)."""
+    def rollback(
+        self, generation: int, *, actor: str = "human", reset_breaker: bool = True
+    ) -> PolicyVersion:
+        """
+        Restore a prior generation's policy (recorded as a new version).
+
+        A human rollback resets the breaker (the human is taking control); an
+        automatic verification rollback does not, so repeated regressions keep
+        accumulating toward the trip threshold.
+        """
         target = next((v for v in self.history if v.generation == generation), None)
         if target is None:
             raise KeyError(f"No such generation {generation}")
@@ -429,14 +525,85 @@ class RecursiveSelfImprovementEngine:
             parent_generation=parent,
             policy=target.policy,
             objective_score=target.objective_score,
+            lock_state=LockState.LOCKED,  # restoring a proven generation
             rationale=f"Rollback to generation {generation} by {actor}.",
         )
         self.history.append(version)
-        self.breaker.reset()
+        if reset_breaker:
+            self.breaker.reset()
         self._audit("self_improvement.rollback", {
             "restored_generation": generation, "new_generation": self.generation, "actor": actor,
         })
         return version
+
+    # -- monitor -> lock / rollback ------------------------------------------
+
+    def verify(self, fresh_outcomes: Iterable[DecisionOutcome] | None = None) -> VerificationReport:
+        """
+        The Monitor → Lock / Rollback stage.
+
+        Prove that the provisional in-force generation actually beats its
+        parent on *fresh* outcomes — not the window it was fitted on. If it
+        holds, lock it. If it regresses, auto-roll back to the parent and feed
+        the miss to the circuit breaker. This is what stops the loop from
+        compounding changes that only looked good in-sample.
+        """
+        current_version = self.history[-1]
+        if current_version.lock_state != LockState.PROVISIONAL:
+            return VerificationReport(
+                generation=self.generation,
+                held_up=True,
+                verification_score=self.score(self.current),
+                locked=current_version.lock_state == LockState.LOCKED,
+                note="Nothing to verify — current generation is not provisional.",
+            )
+
+        fresh = list(fresh_outcomes) if fresh_outcomes is not None else self.outcomes
+        parent_gen = current_version.parent_generation
+        parent = next((v for v in self.history if v.generation == parent_gen), None)
+        current_score = self.objective(fresh, self.current)
+        parent_score = self.objective(fresh, parent.policy) if parent else float("-inf")
+        held_up = current_score >= parent_score
+
+        self.breaker.record(improved=held_up)
+
+        if held_up:
+            current_version.lock_state = LockState.LOCKED
+            self._audit("self_improvement.lock", {
+                "generation": self.generation,
+                "verification_score": current_score,
+                "parent_score": parent_score,
+            })
+            return VerificationReport(
+                generation=self.generation,
+                held_up=True,
+                verification_score=round(current_score, 2),
+                locked=True,
+                note=f"Generation {self.generation} held up on fresh outcomes — locked.",
+            )
+
+        # Regressed — mark and roll back to the proven parent.
+        current_version.lock_state = LockState.ROLLED_BACK
+        restored = (
+            self.rollback(parent_gen, actor="monitor-auto", reset_breaker=False)
+            if parent else current_version
+        )
+        self._audit("self_improvement.verify_rollback", {
+            "regressed_generation": current_version.generation,
+            "verification_score": current_score,
+            "parent_score": parent_score,
+            "restored_generation": parent_gen,
+        })
+        return VerificationReport(
+            generation=restored.generation,
+            held_up=False,
+            verification_score=round(current_score, 2),
+            rolled_back_to=parent_gen,
+            note=(
+                f"Generation {current_version.generation} regressed on fresh "
+                f"outcomes — auto-rolled back to generation {parent_gen}."
+            ),
+        )
 
     # -- cycle ---------------------------------------------------------------
 
@@ -446,10 +613,13 @@ class RecursiveSelfImprovementEngine:
         produced and governed, but only committed when ``auto_apply`` is set
         AND governance returned AUTO_APPLY AND the breaker is closed.
         """
+        stages = ["observe", "normalize", "score", "compare", "diagnose", "propose", "govern"]
         if self.breaker.open:
             return GenerationReport(
                 generation=self.generation,
                 sample_size=len(self.outcomes),
+                control_mode=self.control_mode,
+                stages=stages,
                 breaker_open=True,
                 note="Circuit breaker open — auto-apply halted, awaiting human reset.",
             )
@@ -459,6 +629,8 @@ class RecursiveSelfImprovementEngine:
             return GenerationReport(
                 generation=self.generation,
                 sample_size=len(self.outcomes),
+                control_mode=self.control_mode,
+                stages=stages,
                 note="No qualifying improvement found this cycle.",
             )
 
@@ -466,24 +638,31 @@ class RecursiveSelfImprovementEngine:
         if auto_apply and proposal.decision == Decision.AUTO_APPLY:
             self.apply(proposal, approved_by="auto")
             applied = True
+            stages.append("deploy")
 
+        note = (
+            "Auto-applied (operational). Run verify() to lock or roll back." if applied
+            else f"Recommended — awaiting human approval ({proposal.decision.value})."
+        )
         return GenerationReport(
             generation=self.generation,
             sample_size=len(self.outcomes),
+            control_mode=self.control_mode,
+            stages=stages,
             proposal=proposal,
             applied=applied,
             breaker_open=self.breaker.open,
-            note=(
-                "Auto-applied." if applied
-                else f"Proposal queued ({proposal.decision.value})."
-            ),
+            note=note,
         )
 
     # -- introspection -------------------------------------------------------
 
     def state(self) -> dict[str, Any]:
+        current_version = self.history[-1]
         return {
             "generation": self.generation,
+            "control_mode": self.control_mode.value,
+            "lock_state": current_version.lock_state.value,
             "policy": self.current.model_dump(),
             "objective_score": self.score(self.current) if self.outcomes else None,
             "window_size": len(self.outcomes),
