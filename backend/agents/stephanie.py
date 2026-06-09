@@ -19,6 +19,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.agents.base import AgentFamily, BaseAgent
+from backend.agents.self_improvement import (
+    DecisionOutcome,
+    RecursiveSelfImprovementEngine,
+)
+from backend.agents.stephanie_policy import StephaniePolicy
 from backend.config.database import async_session
 from backend.models.change_order import ChangeOrder, ChangeOrderStatus
 from backend.models.estimate import Estimate, EstimateStatus
@@ -44,7 +49,13 @@ class StephanieAgent(BaseAgent):
       - Trust coordinator: wraps all actions in audit trail context
     """
 
-    def __init__(self, agent_id: str | None = None) -> None:
+    def __init__(
+        self,
+        agent_id: str | None = None,
+        *,
+        policy: StephaniePolicy | None = None,
+        self_improvement: RecursiveSelfImprovementEngine | None = None,
+    ) -> None:
         super().__init__(
             name="Stephanie.ai",
             family=AgentFamily.STEPHANIE,
@@ -54,6 +65,14 @@ class StephanieAgent(BaseAgent):
             ),
             agent_id=agent_id or "stephanie-primary",
         )
+        # Tunable decision policy + the recursive self-improvement loop that
+        # learns from the realized outcomes of Stephanie's own decisions.
+        self.self_improvement = self_improvement or RecursiveSelfImprovementEngine(policy)
+
+    @property
+    def policy(self) -> StephaniePolicy:
+        """Current decision policy (the self-improvement loop's live generation)."""
+        return self.self_improvement.current
 
     # -----------------------------------------------------------------------
     # Task router (BaseAgent interface)
@@ -73,6 +92,11 @@ class StephanieAgent(BaseAgent):
                 return await self.route_task(payload)
             case "get_telemetry":
                 return await self.get_telemetry()
+            case "run_self_improvement":
+                return await self.run_self_improvement(
+                    auto_apply=bool(payload.get("auto_apply", False)),
+                    lookback_days=int(payload.get("lookback_days", 180)),
+                )
             # Routed events — Stephanie is the default intake for pipeline events
             case "lead_created" | "lead_updated":
                 return await self.route_intake(payload.get("lead_data", payload))
@@ -111,8 +135,8 @@ class StephanieAgent(BaseAgent):
             "routed_at": datetime.now(timezone.utc).isoformat(),
         }
 
-        # High-value fast track
-        if estimated_value >= 100_000:
+        # High-value fast track (threshold is tuned by the self-improvement loop)
+        if estimated_value >= self.policy.high_value_threshold:
             routing_decision.update({
                 "pipeline_stage": "fast_track_qualification",
                 "priority": "high",
@@ -222,7 +246,12 @@ class StephanieAgent(BaseAgent):
             "critical": critical,
             "high": high,
             "medium": medium,
-            "health_score": max(0, 100 - (critical * 15) - (high * 5) - (medium * 2)),
+            "health_score": max(0, round(
+                100
+                - (critical * self.policy.health_weight_critical)
+                - (high * self.policy.health_weight_high)
+                - (medium * self.policy.health_weight_medium)
+            )),
         }
 
         logger.info(
@@ -237,7 +266,7 @@ class StephanieAgent(BaseAgent):
     async def _gather_stale_leads(
         self, db: AsyncSession, now: datetime
     ) -> dict[str, Any]:
-        cutoff = now - timedelta(days=5)
+        cutoff = now - timedelta(days=self.policy.stale_lead_days)
         result = await db.execute(
             select(Lead).where(
                 Lead.status.in_([
@@ -249,6 +278,8 @@ class StephanieAgent(BaseAgent):
             )
         )
         items = []
+        crit_days = self.policy.stale_critical_days
+        high_days = self.policy.stale_high_days
         for lead in result.scalars():
             days_stale = (now - lead.updated_at.replace(tzinfo=timezone.utc)).days
             items.append({
@@ -257,8 +288,8 @@ class StephanieAgent(BaseAgent):
                 "status": lead.status.value,
                 "estimated_value": lead.estimated_value,
                 "days_stale": days_stale,
-                "severity": "critical" if days_stale > 14 else "high" if days_stale > 7 else "medium",
-                "action": "Follow up immediately" if days_stale > 14 else "Schedule contact",
+                "severity": "critical" if days_stale > crit_days else "high" if days_stale > high_days else "medium",
+                "action": "Follow up immediately" if days_stale > crit_days else "Schedule contact",
             })
         return {"count": len(items), "items": items}
 
@@ -278,7 +309,7 @@ class StephanieAgent(BaseAgent):
                 "deposit_required": job.deposit_required,
                 "deposit_paid": job.deposit_paid,
                 "outstanding": outstanding,
-                "severity": "critical" if outstanding > 10_000 else "high",
+                "severity": "critical" if outstanding > self.policy.deposit_critical_outstanding else "high",
                 "action": "Send deposit payment link",
             })
         return {
@@ -336,16 +367,18 @@ class StephanieAgent(BaseAgent):
             )
         )
         items = []
+        margin_floor = self.policy.at_risk_margin_floor_pct
+        critical_margin = self.policy.at_risk_critical_margin_pct
         for job in result.scalars():
             margin_pct = (job.contract_value - job.total_costs) / job.contract_value * 100
-            if margin_pct < 15:
+            if margin_pct < margin_floor:
                 items.append({
                     "id": job.id,
                     "job_number": job.job_number,
                     "contract_value": job.contract_value,
                     "total_costs": job.total_costs,
                     "margin_percent": round(margin_pct, 1),
-                    "severity": "critical" if margin_pct < 5 else "high",
+                    "severity": "critical" if margin_pct < critical_margin else "high",
                     "action": "Review costs and consider change order",
                 })
         return {"count": len(items), "items": items}
@@ -556,4 +589,64 @@ class StephanieAgent(BaseAgent):
                 "pipeline_value": float(pipeline_value),
             },
             "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # -----------------------------------------------------------------------
+    # 5. Recursive self-improvement
+    # -----------------------------------------------------------------------
+
+    async def learn_from_lead_outcomes(self, lookback_days: int = 180) -> int:
+        """
+        Build decision outcomes from closed leads and feed them to the loop.
+
+        Each lead that reached a terminal state (won/lost) is a labelled
+        example: the features Stephanie routed on, plus whether it converted
+        and for how much. This is how she learns from her own decisions.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+        terminal = [LeadStatus.WON, LeadStatus.LOST, LeadStatus.ARCHIVED]
+        async with async_session() as db:
+            result = await db.execute(
+                select(Lead).where(
+                    Lead.status.in_(terminal),
+                    Lead.updated_at >= cutoff,
+                )
+            )
+            leads = result.scalars().all()
+
+        outcomes: list[DecisionOutcome] = []
+        for lead in leads:
+            won = lead.status == LeadStatus.WON
+            outcomes.append(DecisionOutcome(
+                lead_id=str(lead.id),
+                features={
+                    "estimated_value": lead.estimated_value or 0,
+                    "source": lead.source.value if hasattr(lead.source, "value") else lead.source,
+                    "property_address": getattr(lead, "property_address", None),
+                    "email": lead.email,
+                },
+                converted=won,
+                won_value=float(lead.estimated_value or 0) if won else 0.0,
+            ))
+        return self.self_improvement.record_outcomes(outcomes)
+
+    async def run_self_improvement(
+        self,
+        *,
+        auto_apply: bool = False,
+        lookback_days: int = 180,
+    ) -> dict[str, Any]:
+        """
+        Run one recursive self-improvement cycle against real lead outcomes.
+
+        Dry-run by default — only LOW-risk, improvement-proven changes with
+        the circuit breaker closed are auto-applied when ``auto_apply`` is set.
+        Everything else is returned as a proposal for human approval.
+        """
+        sample = await self.learn_from_lead_outcomes(lookback_days)
+        report = self.self_improvement.run_cycle(auto_apply=auto_apply)
+        return {
+            "samples_ingested": sample,
+            "report": report.model_dump(),
+            "state": self.self_improvement.state(),
         }

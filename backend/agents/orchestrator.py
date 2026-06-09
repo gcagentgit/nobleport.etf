@@ -40,6 +40,7 @@ EVENT_ROUTING: dict[str, AgentFamily] = {
     "generate_ops_brief": AgentFamily.STEPHANIE,
     "route_task": AgentFamily.STEPHANIE,
     "get_telemetry": AgentFamily.STEPHANIE,
+    "run_self_improvement": AgentFamily.STEPHANIE,
 
     # GCagent: construction execution
     "job_activated": AgentFamily.GCAGENT,
