@@ -332,6 +332,61 @@ export interface SalesIntelligence {
   collaboration: SalesHandoff[];
 }
 
+// ---------------------------------------------------------------------------
+// Program Completion (portfolio view)
+// ---------------------------------------------------------------------------
+
+export type ProgramDimension = 'backend' | 'api' | 'ui' | 'tests' | 'docs' | 'contract';
+export type ProgramStatus = 'complete' | 'in_progress' | 'planned';
+
+export interface ProgramDeliverable {
+  dimension: ProgramDimension;
+  label: string;
+  satisfied: boolean;
+  path: string | null;
+}
+
+export interface ProjectCompletion {
+  key: string;
+  name: string;
+  summary: string;
+  category: string;
+  owner: string;
+  since: string;
+  completion: number; // 0..1
+  status: ProgramStatus;
+  delivered: number;
+  total: number;
+  coverage: ProgramDimension[];
+  deliverables: ProgramDeliverable[];
+}
+
+export interface ProgramCategoryRow {
+  category: string;
+  projects: number;
+  completion: number; // 0..1
+}
+
+export interface ProgramDimensionRow {
+  dimension: ProgramDimension;
+  projects: number;
+}
+
+export interface ProgramReport {
+  generatedAt: string;
+  generatedFrom: string;
+  summary: {
+    totalProjects: number;
+    complete: number;
+    inProgress: number;
+    planned: number;
+    overallCompletion: number; // 0..1
+  };
+  byCategory: ProgramCategoryRow[];
+  dimensionCoverage: ProgramDimensionRow[];
+  projects: ProjectCompletion[];
+}
+
 export interface DashboardOverview {
   generatedAt: string;
   kpis: KpiTile[];
