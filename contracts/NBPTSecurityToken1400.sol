@@ -102,6 +102,19 @@ contract NBPTSecurityToken1400 is AccessControl, ReentrancyGuard, Pausable {
     string public symbol = "NBPT";
     uint8 public constant decimals = 18;
 
+    // White-label, per-deployment descriptor. For a single-asset token (e.g. a
+    // land parcel) point this at the off-chain document set — survey, title
+    // report, zoning certificate, encumbrances — on IPFS or other immutable
+    // storage. Mirrors the ERC-1400 `_tokenDetails` convention.
+    string public tokenDetails;
+
+    // Smallest indivisible unit, in base units (ERC-1410 granularity). Every
+    // issued, transferred, redeemed, or subscribed amount must be an exact
+    // multiple of this. Defaults to 1 (fully divisible — preserves prior
+    // behavior). For a parcel where 1 token == 1% ownership and decimals == 18,
+    // set granularity to 1e18 (whole-percent units only) or 1e15 (0.1% steps).
+    uint256 public granularity = 1;
+
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
@@ -236,6 +249,10 @@ contract NBPTSecurityToken1400 is AccessControl, ReentrancyGuard, Pausable {
     event ReserveDeposited(address indexed from, uint256 amount);
     event ReserveWithdrawn(address indexed to, uint256 amount);
     event ApprovalGatewayUpdated(address indexed gateway, uint256 thresholdUSDC);
+
+    // White-label configuration
+    event TokenMetadataUpdated(string name, string symbol, string tokenDetails);
+    event GranularityUpdated(uint256 oldGranularity, uint256 newGranularity);
 
     // ============ Modifiers ============
 
@@ -407,6 +424,7 @@ contract NBPTSecurityToken1400 is AccessControl, ReentrancyGuard, Pausable {
     {
         if (paused()) return (STATUS_PAUSED_OR_LOCKED, "token paused");
         if (to == address(0)) return (STATUS_TRANSFER_FAILURE, "transfer to zero");
+        if (value % granularity != 0) return (STATUS_TRANSFER_FAILURE, "not granular");
         if (_partitionBalances[partition][from] < value) return (STATUS_INSUFFICIENT_BALANCE, "insufficient balance");
         if (investors[from].frozen) return (STATUS_SENDER_NOT_ELIGIBLE, "sender frozen");
         if (investors[to].frozen) return (STATUS_RECEIVER_NOT_ELIGIBLE, "receiver frozen");
@@ -434,6 +452,7 @@ contract NBPTSecurityToken1400 is AccessControl, ReentrancyGuard, Pausable {
         require(issuable, "Issuance permanently closed");
         require(to != address(0), "Issue to zero");
         require(value > 0, "Zero value");
+        require(value % granularity == 0, "Not granular");
         require(investors[to].kycVerified, "Recipient not KYC verified");
         require(!accreditationRequired || _isAccredited(to), "Recipient not accredited");
 
@@ -467,6 +486,7 @@ contract NBPTSecurityToken1400 is AccessControl, ReentrancyGuard, Pausable {
         whenNotPaused
         nonReentrant
     {
+        require(value % granularity == 0, "Not granular");
         require(_partitionBalances[partition][msg.sender] >= value, "Insufficient balance");
         _burn(partition, msg.sender, value);
         emit RedeemedByPartition(partition, address(0), msg.sender, value, data);
@@ -504,6 +524,9 @@ contract NBPTSecurityToken1400 is AccessControl, ReentrancyGuard, Pausable {
         // tokens = usdcAmount * 1e18 / pegPriceUSDC
         uint256 tokens = (usdcAmount * (10 ** uint256(decimals))) / pegPriceUSDC;
         require(tokens > 0, "Below minimum subscription");
+        // Subscription must resolve to a whole number of tradable units. The
+        // investor pays USDC matching an exact multiple of `granularity`.
+        require(tokens % granularity == 0, "Subscription not granular");
 
         usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
         usdcReserve += usdcAmount;
@@ -533,6 +556,7 @@ contract NBPTSecurityToken1400 is AccessControl, ReentrancyGuard, Pausable {
         nonReentrant
     {
         require(tokens > 0, "Zero tokens");
+        require(tokens % granularity == 0, "Not granular");
         require(_partitionBalances[partition][msg.sender] >= tokens, "Insufficient balance");
         require(!investors[msg.sender].frozen, "Account frozen");
         require(block.timestamp >= investors[msg.sender].lockupUntil, "Lockup active");
@@ -744,6 +768,45 @@ contract NBPTSecurityToken1400 is AccessControl, ReentrancyGuard, Pausable {
 
     function setDefaultLockupPeriod(uint64 period) external onlyRole(GOVERNANCE_ADMIN_ROLE) {
         defaultLockupPeriod = period;
+    }
+
+    // ============ White-label configuration ============
+
+    /**
+     * @notice White-label the token to a specific issuer / asset.
+     * @dev For a land-parcel deployment set name to the legal entity
+     *      (e.g. "123 Country Road LLC"), symbol to a short ticker
+     *      (e.g. "LAND1"), and tokenDetails to the IPFS/URI pointer for the
+     *      off-chain document set (survey, title report, zoning, encumbrances).
+     *      Metadata is informational; the binding legal documents are anchored
+     *      by hash via setDocument (ERC-1643).
+     */
+    function setTokenMetadata(
+        string calldata newName,
+        string calldata newSymbol,
+        string calldata newTokenDetails
+    ) external onlyRole(GOVERNANCE_ADMIN_ROLE) {
+        require(bytes(newName).length > 0, "Name required");
+        require(bytes(newSymbol).length > 0, "Symbol required");
+        name = newName;
+        symbol = newSymbol;
+        tokenDetails = newTokenDetails;
+        emit TokenMetadataUpdated(newName, newSymbol, newTokenDetails);
+    }
+
+    /**
+     * @notice Set the smallest tradable unit (ERC-1410 granularity).
+     * @dev Only settable while nothing has been issued, so existing balances can
+     *      never be stranded below the unit size. Must be >= 1. For a parcel
+     *      where 1 token == 1% and decimals == 18, use 1e18 for whole-percent
+     *      units or 1e15 for 0.1% steps.
+     */
+    function setGranularity(uint256 newGranularity) external onlyRole(GOVERNANCE_ADMIN_ROLE) {
+        require(newGranularity >= 1, "Granularity must be >= 1");
+        require(_totalSupply == 0, "Supply already issued");
+        uint256 old = granularity;
+        granularity = newGranularity;
+        emit GranularityUpdated(old, newGranularity);
     }
 
     // ============ Launch gate / peg administration ============

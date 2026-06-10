@@ -64,6 +64,22 @@ ERC-1400 family plus a USDC subscription/redemption rail.
 | ERC-1643 (documents) | `setDocument`, `getDocument`, `getAllDocuments`, `removeDocument` (hash + URI for prospectus, subscription agreement, PPM, etc.) |
 | ERC-1644 (controller) | `controllerTransfer`, `controllerRedeem` (forced transfer for court orders / key recovery), one-way `disableControllability` |
 
+### White-label configuration
+
+The token is white-label: a single deployment can be configured to a specific
+issuer or asset (e.g. a land parcel) without changing code.
+
+- `setTokenMetadata(name, symbol, tokenDetails)` (governance) — set the legal
+  entity name, ticker, and an IPFS/URI `tokenDetails` pointer to the off-chain
+  document set. Mirrors the ERC-1400 `_tokenDetails` convention.
+- `granularity` + `setGranularity(unit)` (governance, pre-issuance only) — the
+  smallest tradable unit (ERC-1410). Every issued/transferred/redeemed/subscribed
+  amount must be an exact multiple. Defaults to `1` (fully divisible); settable
+  only while `totalSupply == 0` so balances can never be stranded.
+
+For a worked single-parcel configuration, see the
+[land-parcel tokenization playbook](./erc1400-land-parcel-playbook.md).
+
 ### USDC peg
 
 - `usdc` (immutable) + `usdcDecimals` recorded at deploy.
