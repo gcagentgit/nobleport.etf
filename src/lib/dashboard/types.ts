@@ -387,6 +387,60 @@ export interface ProgramReport {
   projects: ProjectCompletion[];
 }
 
+// ---------------------------------------------------------------------------
+// Systems Truth Registry
+// ---------------------------------------------------------------------------
+
+export type TruthBucketKey =
+  | 'verified'
+  | 'staged'
+  | 'claimed'
+  | 'demo'
+  | 'planned'
+  | 'blocked'
+  | 'legal_hold'
+  | 'reference';
+
+export interface SystemNodeRow {
+  key: string;
+  name: string;
+  category: string;
+  bucket: TruthBucketKey;
+  summary: string;
+  evidence: string[];
+  nextGate: string;
+  source: string;
+  humanApprovalRequired: boolean;
+  verifiedBy: string | null;
+}
+
+export interface TruthBucketRow {
+  bucket: TruthBucketKey;
+  definition: string;
+  promotionGate: string;
+  count: number;
+}
+
+export interface ExecutionPathStep {
+  step: string;
+  node: string;
+  why: string;
+}
+
+export interface SystemsRegistry {
+  generatedAt: string;
+  hardTruth: string;
+  summary: {
+    totalSystems: number;
+    verified: number;
+    humanGated: number;
+    byBucket: Record<TruthBucketKey, number>;
+  };
+  buckets: TruthBucketRow[];
+  executionPath: ExecutionPathStep[];
+  systems: SystemNodeRow[];
+}
+
 export interface DashboardOverview {
   generatedAt: string;
   kpis: KpiTile[];

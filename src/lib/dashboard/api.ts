@@ -25,6 +25,7 @@ import {
   getRevenueRules as mockRules,
   getSalesIntelligence as mockSales,
   getStaleDeals as mockDeals,
+  getSystemsRegistry as mockSystems,
   getVoiceSession as mockVoiceSession,
   getVoiceTranscript as mockVoiceTranscript,
 } from './mock';
@@ -38,6 +39,7 @@ export const fetchInvoices = async () => mockInvoices();
 export const fetchRevenueRules = async () => mockRules();
 export const fetchSalesIntelligence = async () => mockSales();
 export const fetchProgramReport = async () => mockProgram();
+export const fetchSystemsRegistry = async () => mockSystems();
 export const fetchJobs = async () => mockJobs();
 export const fetchPermits = async () => mockPermits();
 export const fetchPermitForecast = async () => mockPermitForecast();
