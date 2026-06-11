@@ -55,20 +55,81 @@ def test_repo_code_complete_is_staged_never_verified():
         assert n.source == "measured:repo"
 
 
-def test_verified_only_via_named_operator_attestation():
+def test_verified_only_via_named_verifier():
     """
-    Verified systems exist only because the operator's control register names
-    a human verifier — every VERIFIED node carries that attestation, and none
-    come from repo measurement or system self-declaration.
+    Every VERIFIED node carries a named verifier — operator attestation or a
+    verification event with third-party telemetry. None are self-declared.
     """
     registry = build_registry()
     verified = [n for n in registry.nodes if n.bucket is TruthBucket.VERIFIED]
-    assert len(verified) == registry.verified_count == 7
+    # 7 register-attested LIVE rows + telegram bot addendum + mission control
+    # promoted by Vercel telemetry.
+    assert len(verified) == registry.verified_count == 9
     for n in verified:
         assert n.verified_by, f"{n.key} verified without a named verifier"
-        assert n.source.startswith("declared:control-register"), (
-            f"{n.key} verified from a non-attested source {n.source}"
-        )
+
+
+# ---------------------------------------------------------------------------
+# Verification pipeline — the only path to a higher verified count
+# ---------------------------------------------------------------------------
+
+def test_mission_control_promoted_by_current_telemetry():
+    nodes = {n.key: n for n in build_registry().nodes}
+    mc = nodes["repo:mission_control"]
+    assert mc.bucket is TruthBucket.VERIFIED
+    assert "Vercel" in (mc.verified_by or "")
+    assert any("0bfae1d" in e for e in mc.evidence)
+
+
+def test_expired_verification_does_not_promote():
+    from datetime import datetime, timezone
+    from backend.systems.verification import VERIFICATION_LOG
+
+    event = VERIFICATION_LOG[0]
+    after_expiry = datetime(2099, 1, 1, tzinfo=timezone.utc)
+    assert event.is_current() is True
+    assert event.is_current(after_expiry) is False
+
+
+def test_verification_of_unknown_system_raises():
+    import pytest
+    from backend.systems.registry import TruthRegistry
+    from backend.systems.verification import VerificationEvent, apply_verifications
+
+    bogus = VerificationEvent(
+        system_key="does_not_exist", verifier="x", method="operator_attestation",
+        evidence=(), verified_at="2026-06-11", expires_at="2026-12-31",
+    )
+    import backend.systems.verification as v
+    original = v.VERIFICATION_LOG
+    v.VERIFICATION_LOG = (bogus,)
+    try:
+        with pytest.raises(ValueError, match="unknown system"):
+            apply_verifications(TruthRegistry())
+    finally:
+        v.VERIFICATION_LOG = original
+
+
+def test_verification_queue_ranks_closest_candidates_first():
+    from backend.systems.verification import verification_queue
+
+    queue = verification_queue()
+    assert queue, "queue should not be empty"
+    pcts = [c["declared_completion_pct"] or 0 for c in queue]
+    assert pcts == sorted(pcts, reverse=True)
+    # Highest declared-completion staged module leads the queue.
+    assert queue[0]["key"] == "reg:unified_wallet"
+    keys = {n.key for n in build_registry().nodes}
+    for c in queue:
+        assert c["key"] in keys
+        assert c["evidence_needed"]
+
+
+def test_telegram_bot_addendum_is_attested():
+    nodes = {n.key: n for n in build_registry().nodes}
+    bot = nodes["reg:telegram_price_bot"]
+    assert bot.bucket is TruthBucket.VERIFIED
+    assert bot.verified_by and "Operator control register" in bot.verified_by
 
 
 def test_external_claims_classified_by_their_own_evidence():

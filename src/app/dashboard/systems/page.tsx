@@ -92,6 +92,48 @@ export default async function SystemsPage() {
           </ol>
         </Panel>
 
+        {/* Verification queue — the only path to a higher verified count */}
+        <Panel
+          title="Verification Queue"
+          subtitle="the path to more verified systems · each row lists the exact evidence that promotes it"
+          padded={false}
+        >
+          <table className="w-full text-sm">
+            <thead className="bg-ink-900/80 text-[11px] uppercase tracking-wider text-ink-400">
+              <tr>
+                <th className="px-4 py-2 text-left">Candidate</th>
+                <th className="px-4 py-2 text-right">Declared</th>
+                <th className="px-4 py-2 text-left">Blocking</th>
+                <th className="px-4 py-2 text-left">Evidence needed to verify</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ink-700">
+              {reg.verificationQueue.map((q) => (
+                <tr key={q.key} className="row-hover align-top">
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium text-ink-100">{q.name}</div>
+                    <div className="text-[10px] text-ink-500">{q.key}</div>
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <span className="num text-ink-200">
+                      {q.declaredCompletionPct != null ? `${q.declaredCompletionPct}%` : '—'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-[11px] text-ink-400">{q.blocking}</td>
+                  <td className="px-4 py-2.5 text-[11px] text-ink-300">{q.evidenceNeeded}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="border-t border-ink-700 px-4 py-2 text-[11px] text-ink-400">
+            Verification log: {reg.verificationLog.length} event
+            {reg.verificationLog.length === 1 ? '' : 's'} ·{' '}
+            {reg.verificationLog
+              .map((e) => `${e.systemKey} by ${e.verifier} (expires ${e.expiresAt})`)
+              .join(' · ')}
+          </div>
+        </Panel>
+
         {/* Bankable core + claimed metrics */}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <Panel

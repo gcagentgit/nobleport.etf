@@ -433,12 +433,30 @@ export interface ClaimedMetricRow {
   label: string;
 }
 
+export interface VerificationQueueRow {
+  key: string;
+  name: string;
+  declaredCompletionPct: number | null;
+  blocking: string;
+  evidenceNeeded: string;
+}
+
+export interface VerificationLogRow {
+  systemKey: string;
+  verifier: string;
+  method: string;
+  verifiedAt: string;
+  expiresAt: string;
+}
+
 export interface SystemsRegistry {
   generatedAt: string;
   hardTruth: string;
   controlTruthFloor: string;
   bankableCore: string[];
   claimedMetrics: ClaimedMetricRow[];
+  verificationQueue: VerificationQueueRow[];
+  verificationLog: VerificationLogRow[];
   summary: {
     totalSystems: number;
     verified: number;

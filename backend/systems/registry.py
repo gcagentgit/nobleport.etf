@@ -253,6 +253,7 @@ class TruthRegistry:
             CLAIMED_NODE_METRICS,
             CONTROL_TRUTH_FLOOR,
         )
+        from backend.systems.verification import VERIFICATION_LOG, verification_queue
 
         ordered = sorted(
             self.nodes,
@@ -262,6 +263,17 @@ class TruthRegistry:
             "control_truth_floor": CONTROL_TRUTH_FLOOR,
             "bankable_core": list(BANKABLE_CORE),
             "claimed_metrics": list(CLAIMED_NODE_METRICS),
+            "verification_queue": verification_queue(),
+            "verification_log": [
+                {
+                    "system_key": e.system_key,
+                    "verifier": e.verifier,
+                    "method": e.method,
+                    "verified_at": e.verified_at,
+                    "expires_at": e.expires_at,
+                }
+                for e in VERIFICATION_LOG
+            ],
             "summary": {
                 "total_systems": len(self.nodes),
                 "by_bucket": self.by_bucket(),
@@ -270,8 +282,8 @@ class TruthRegistry:
             },
             "hard_truth": (
                 f"{self.verified_count} of {len(self.nodes)} systems are verified live "
-                "by a named verifier (operator attestation). Everything else is staged, "
-                "claimed, demo, planned, blocked, or held — and is labeled as such."
+                "by a named verifier (operator attestation or third-party telemetry). "
+                "The count grows only through verification events — never by relabeling."
             ),
             "buckets": [
                 {
@@ -289,11 +301,14 @@ class TruthRegistry:
 
 def build_registry() -> TruthRegistry:
     """
-    Assemble the full registry: measured repo nodes, declared externals, and
-    the operator's 50-module control register (imported lazily to avoid a
-    circular import — control_register builds SystemNodes from this module).
+    Assemble the full registry: measured repo nodes, declared externals, the
+    operator's 50-module control register, and the attested addendum — then
+    apply the verification log, the only mechanism that promotes a node to
+    VERIFIED. (Imports are lazy to avoid circularity — those modules build
+    SystemNodes from this one.)
     """
     from backend.systems.control_register import register_nodes
+    from backend.systems.verification import ATTESTED_ADDENDUM, apply_verifications
 
     registry = TruthRegistry()
     for node in nodes_from_program():
@@ -302,4 +317,6 @@ def build_registry() -> TruthRegistry:
         registry.register(node)
     for node in register_nodes():
         registry.register(node)
-    return registry
+    for node in ATTESTED_ADDENDUM:
+        registry.register(node)
+    return apply_verifications(registry)
