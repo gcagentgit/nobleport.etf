@@ -55,12 +55,20 @@ def test_repo_code_complete_is_staged_never_verified():
         assert n.source == "measured:repo"
 
 
-def test_registry_has_zero_verified_systems():
-    """The honest baseline: nothing is independently verified live yet."""
+def test_verified_only_via_named_operator_attestation():
+    """
+    Verified systems exist only because the operator's control register names
+    a human verifier — every VERIFIED node carries that attestation, and none
+    come from repo measurement or system self-declaration.
+    """
     registry = build_registry()
-    assert registry.verified_count == 0
-    payload = registry.to_dict()
-    assert "0 of" in payload["hard_truth"]
+    verified = [n for n in registry.nodes if n.bucket is TruthBucket.VERIFIED]
+    assert len(verified) == registry.verified_count == 7
+    for n in verified:
+        assert n.verified_by, f"{n.key} verified without a named verifier"
+        assert n.source.startswith("declared:control-register"), (
+            f"{n.key} verified from a non-attested source {n.source}"
+        )
 
 
 def test_external_claims_classified_by_their_own_evidence():
@@ -93,3 +101,74 @@ def test_execution_path_references_real_nodes():
     payload = registry.to_dict()
     for step in payload["execution_path"]:
         assert step["node"] in keys, f"execution path references unknown node {step['node']}"
+
+
+# ---------------------------------------------------------------------------
+# 50-module control register (2026-06-11)
+# ---------------------------------------------------------------------------
+
+def test_control_register_has_50_unique_rows():
+    from backend.systems.control_register import CONTROL_REGISTER
+    assert len(CONTROL_REGISTER) == 50
+    nums = [r.num for r in CONTROL_REGISTER]
+    assert nums == list(range(1, 51))
+    keys = [r.key for r in CONTROL_REGISTER]
+    assert len(keys) == len(set(keys))
+
+
+def test_composite_statuses_never_map_to_verified():
+    """Conservative mapping: any hedged/composite status takes the lower bucket."""
+    from backend.systems.control_register import CONTROL_REGISTER
+    for row in CONTROL_REGISTER:
+        if "/" in row.declared_status:
+            assert row.bucket is not TruthBucket.VERIFIED, (
+                f"row {row.num} ({row.key}): composite status "
+                f"{row.declared_status!r} must not be VERIFIED"
+            )
+
+
+def test_register_live_rows_match_attested_set():
+    from backend.systems.control_register import CONTROL_REGISTER
+    live_keys = {r.key for r in CONTROL_REGISTER if r.bucket is TruthBucket.VERIFIED}
+    assert live_keys == {
+        "construction_intake", "construction_orchestration",
+        "scope_estimate_engine", "proposal_generator",
+        "manual_permit_fallback", "kuzo_safe_swap", "kuzo_dashboard",
+    }
+
+
+def test_register_holds_and_blocks():
+    from backend.systems.control_register import CONTROL_REGISTER
+    rows = {r.key: r for r in CONTROL_REGISTER}
+    assert rows["real_estate_nft"].bucket is TruthBucket.LEGAL_HOLD
+    assert rows["fiat_router"].bucket is TruthBucket.LEGAL_HOLD
+    assert rows["swap_execution"].bucket is TruthBucket.BLOCKED
+    assert rows["treasury_bot_v3"].bucket is TruthBucket.BLOCKED
+    assert rows["permitstream_monitor"].bucket is TruthBucket.BLOCKED
+    # All holds/blocks on money or regulated lanes are human-gated.
+    for key in ("real_estate_nft", "fiat_router", "swap_execution", "treasury_bot_v3"):
+        assert rows[key].human_gated is True
+
+
+def test_register_claims_and_demos():
+    from backend.systems.control_register import CONTROL_REGISTER
+    rows = {r.key: r for r in CONTROL_REGISTER}
+    assert rows["avatar_gpu_layer"].bucket is TruthBucket.CLAIMED
+    assert rows["zk_kyt_compliance"].bucket is TruthBucket.CLAIMED
+    assert rows["sales_sim_layer"].bucket is TruthBucket.DEMO
+
+
+def test_bankable_core_references_registered_nodes():
+    from backend.systems.control_register import BANKABLE_CORE
+    keys = {n.key for n in build_registry().nodes}
+    assert len(BANKABLE_CORE) == 12
+    for k in BANKABLE_CORE:
+        assert k in keys, f"bankable core references unknown node {k}"
+
+
+def test_payload_carries_truth_floor_and_claimed_metrics():
+    payload = build_registry().to_dict()
+    assert "0 external live nodes" in payload["control_truth_floor"]
+    claims = {m["claim"] for m in payload["claimed_metrics"]}
+    assert any("3,012" in c for c in claims)
+    assert any("112 AI agents" in c for c in claims)

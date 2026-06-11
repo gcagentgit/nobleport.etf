@@ -59,6 +59,9 @@ export default async function SystemsPage() {
             </span>
           </div>
           <p className="mt-1.5 text-[12px] leading-relaxed text-amber-200/80">{reg.hardTruth}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-amber-200/60">
+            Control truth floor: {reg.controlTruthFloor}
+          </p>
         </div>
 
         {/* Bucket summary tiles */}
@@ -88,6 +91,50 @@ export default async function SystemsPage() {
             ))}
           </ol>
         </Panel>
+
+        {/* Bankable core + claimed metrics */}
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <Panel
+            title="Bankable Operating Core"
+            subtitle="harden these 12 revenue modules first"
+          >
+            <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {reg.bankableCore.map((key, i) => {
+                const node = reg.systems.find((s) => s.key === key);
+                return (
+                  <li key={key} className="flex items-center gap-2 text-[12px]">
+                    <span className="num text-ink-500">{i + 1}.</span>
+                    <span className="text-ink-200">{node?.name ?? key}</span>
+                    {node && <span className={BUCKET_PILL[node.bucket]}>{node.bucket}</span>}
+                  </li>
+                );
+              })}
+            </ol>
+          </Panel>
+
+          <Panel title="Claimed Node Metrics" subtitle="documented claims · pending proof" padded={false}>
+            <table className="w-full text-sm">
+              <thead className="bg-ink-900/80 text-[11px] uppercase tracking-wider text-ink-400">
+                <tr>
+                  <th className="px-4 py-2 text-left">Claim</th>
+                  <th className="px-4 py-2 text-left">Source</th>
+                  <th className="px-4 py-2 text-left">Honest label</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-700">
+                {reg.claimedMetrics.map((m) => (
+                  <tr key={m.claim} className="row-hover">
+                    <td className="px-4 py-2.5 text-ink-100">{m.claim}</td>
+                    <td className="px-4 py-2.5 text-[11px] text-ink-400">{m.source}</td>
+                    <td className="px-4 py-2.5">
+                      <span className="pill-warn text-[10px]">{m.label}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Panel>
+        </div>
 
         {/* Systems grouped by bucket */}
         {grouped.map(({ bucket, nodes }) => (

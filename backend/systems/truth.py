@@ -41,8 +41,8 @@ class TruthBucket(str, Enum):
 # Human-readable definition per bucket — the single source for API/dashboard.
 BUCKET_DEFINITIONS: dict[TruthBucket, str] = {
     TruthBucket.VERIFIED: (
-        "Independently verified live production. Carries a named verifier and "
-        "verification evidence. Never self-declared."
+        "Verified live by a named, accountable verifier — operator attestation "
+        "or independent telemetry. Never self-declared by the system itself."
     ),
     TruthBucket.STAGED: (
         "Built and measurable — code, tests, and docs exist on disk — but not "

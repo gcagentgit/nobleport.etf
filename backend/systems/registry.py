@@ -248,11 +248,20 @@ class TruthRegistry:
         return sum(1 for n in self.nodes if n.bucket is TruthBucket.VERIFIED)
 
     def to_dict(self) -> dict[str, object]:
+        from backend.systems.control_register import (
+            BANKABLE_CORE,
+            CLAIMED_NODE_METRICS,
+            CONTROL_TRUTH_FLOOR,
+        )
+
         ordered = sorted(
             self.nodes,
             key=lambda n: (list(TruthBucket).index(n.bucket), n.name),
         )
         return {
+            "control_truth_floor": CONTROL_TRUTH_FLOOR,
+            "bankable_core": list(BANKABLE_CORE),
+            "claimed_metrics": list(CLAIMED_NODE_METRICS),
             "summary": {
                 "total_systems": len(self.nodes),
                 "by_bucket": self.by_bucket(),
@@ -260,9 +269,9 @@ class TruthRegistry:
                 "human_gated": sum(1 for n in self.nodes if n.human_approval_required),
             },
             "hard_truth": (
-                f"{self.verified_count} of {len(self.nodes)} systems are independently "
-                "verified live production. Everything else is staged, claimed, demo, "
-                "planned, blocked, or held — and is labeled as such."
+                f"{self.verified_count} of {len(self.nodes)} systems are verified live "
+                "by a named verifier (operator attestation). Everything else is staged, "
+                "claimed, demo, planned, blocked, or held — and is labeled as such."
             ),
             "buckets": [
                 {
@@ -279,10 +288,18 @@ class TruthRegistry:
 
 
 def build_registry() -> TruthRegistry:
-    """Assemble the full registry: measured repo nodes + declared externals."""
+    """
+    Assemble the full registry: measured repo nodes, declared externals, and
+    the operator's 50-module control register (imported lazily to avoid a
+    circular import — control_register builds SystemNodes from this module).
+    """
+    from backend.systems.control_register import register_nodes
+
     registry = TruthRegistry()
     for node in nodes_from_program():
         registry.register(node)
     for node in DECLARED_NODES:
+        registry.register(node)
+    for node in register_nodes():
         registry.register(node)
     return registry

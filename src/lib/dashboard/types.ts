@@ -427,9 +427,18 @@ export interface ExecutionPathStep {
   why: string;
 }
 
+export interface ClaimedMetricRow {
+  claim: string;
+  source: string;
+  label: string;
+}
+
 export interface SystemsRegistry {
   generatedAt: string;
   hardTruth: string;
+  controlTruthFloor: string;
+  bankableCore: string[];
+  claimedMetrics: ClaimedMetricRow[];
   summary: {
     totalSystems: number;
     verified: number;

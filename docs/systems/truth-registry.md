@@ -32,6 +32,32 @@ system is *built*, not that it is *live*
 baseline is **0 verified systems**, and the registry says so in its
 `hard_truth` field.
 
+## 50-Module Honest Control Register (2026-06-11)
+
+The operator's attested control register is ingested as a third evidence
+source (`backend/systems/control_register.py`, source tag
+`declared:control-register-2026-06-11`). Mapping rules, enforced by tests:
+
+- **LIVE (unhedged)** → `VERIFIED`, with the operator register as the named,
+  accountable verifier — human attestation, never system self-declaration.
+  The 7 attested-live modules: Construction Intake (95%), Construction
+  Orchestration, Scope & Estimate Engine, Proposal Generator, Manual Permit
+  Fallback, KUZO Safe Swap read-only (92%), KUZO Dashboard (95%).
+- **Composite statuses always take the more restrictive bucket** —
+  `LIVE/STAGED` → STAGED, `STAGED/CLAIMED` → CLAIMED, `BLOCKED/STAGED` →
+  BLOCKED, `HOLD/STAGED` → LEGAL_HOLD or BLOCKED per the governing reason
+  (`test_composite_statuses_never_map_to_verified`).
+- **TARGET** → PLANNED · **SIMULATED** → DEMO · money/regulated holds
+  (RealEstateNFT, FiatRouter, TreasuryBotV3, swap execution) are human-gated.
+
+The register's truth floor is carried in the payload verbatim: **0 external
+live nodes are controlled from chat** — AI control covers coordination,
+drafting, audit, build specs, and authorized connector actions only. Claimed
+node metrics (3,012 validators, 88ms p95, 112 agents, the 20-row "Meet1000"
+roster) are recorded as claims pending telemetry proof, and the register's
+**bankable operating core** (12 revenue modules to harden first) is exposed
+at `bankable_core`.
+
 ## Two evidence sources
 
 1. **Measured (`measured:repo`)** — the 14 repo projects bridge in from the
