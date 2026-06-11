@@ -253,6 +253,22 @@ PROGRAM: tuple[Project, ...] = (
         ),
     ),
     Project(
+        key="stephanie_modules",
+        name="Stephanie.ai Module Framework",
+        summary="50-module execution framework: governed routing, gates, decision chain.",
+        category=Category.PLATFORM,
+        owner="Stephanie.ai",
+        since="50-Module Register",
+        deliverables=(
+            _d(Dimension.BACKEND, "Framework + catalog + orchestrator", "backend/stephanie/framework.py", "backend/stephanie/orchestrator.py"),
+            _d(Dimension.BACKEND, "Working implementations", "backend/stephanie/impl/roofing_takeoff.py", "backend/stephanie/impl/change_order_ledger.py"),
+            _d(Dimension.API, "Modules API", "backend/api/modules.py"),
+            _d(Dimension.TESTS, "Framework tests", "backend/tests/test_stephanie_modules.py"),
+            _d(Dimension.UI, "Modules dashboard", "src/app/dashboard/modules/page.tsx"),
+            _d(Dimension.DOCS, "Framework doc", "docs/stephanie/50-module-framework.md"),
+        ),
+    ),
+    Project(
         key="strategic_positioning",
         name="Strategic Positioning",
         summary="Market positioning and go-to-market analysis.",

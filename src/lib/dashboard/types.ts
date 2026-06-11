@@ -468,6 +468,36 @@ export interface SystemsRegistry {
   systems: SystemNodeRow[];
 }
 
+// ---------------------------------------------------------------------------
+// Stephanie.ai Module Framework
+// ---------------------------------------------------------------------------
+
+export type ModuleBuildState = 'executable' | 'bound' | 'scaffold';
+
+export interface StephanieModuleRow {
+  key: string;
+  name: string;
+  registerNum: number;
+  category: string;
+  function: string;
+  bucket: TruthBucketKey;
+  capabilities: string[];
+  existingBindings: string[];
+  bound: boolean;
+  buildState: ModuleBuildState;
+  humanGated: boolean;
+}
+
+export interface ModuleCatalog {
+  generatedAt: string;
+  totalModules: number;
+  executable: number;
+  bound: number;
+  scaffold: number;
+  humanGated: number;
+  modules: StephanieModuleRow[];
+}
+
 export interface DashboardOverview {
   generatedAt: string;
   kpis: KpiTile[];
