@@ -30,7 +30,7 @@ offer of securities.**
 
 | Component | Status | Reality |
 |-----------|--------|---------|
-| Token 2022 Asset Backing | **DOCUMENTED — chain conflict** | Token-2022 is a *Solana* token program. The implemented token is `contracts/NBPTSecurityToken1400.sol` (ERC-1400, EVM, source-only, not deployed). Either the diagram should say ERC-1400, or a Solana implementation must be built from scratch. **Recommendation: reconcile to ERC-1400** — it exists, has the compliance hooks (transfer restrictions, `liveOfferingCleared`), and matches every other tokenization doc in this repo. |
+| Token 2022 Asset Backing | **DOCUMENTED — chain conflict** | Token-2022 is a *Solana* token program (Token Extensions: transfer fees, interest-bearing mechanics, confidential transfers encodable in token metadata). The implemented token is `contracts/NBPTSecurityToken1400.sol` (ERC-1400, EVM, source-only, not deployed). Either the diagram should say ERC-1400, or a Solana implementation must be built from scratch. **Recommendation: reconcile to ERC-1400** — it exists, has the compliance hooks (transfer restrictions, `liveOfferingCleared`), and matches every other tokenization doc in this repo. Token-2022's native extensions are genuinely attractive for fee/confidentiality mechanics, but choosing Solana means rebuilding the compliance layer from zero. Chain decision is Michael's call. |
 | Smart Contract NAV Calculation | **DOCUMENTED** | No NAV contract or oracle integration code exists. `NPETF.sol` is named in docs with no source. The "Oracle Network" (Chainlink feeds, valuation) has zero integration code. |
 | Automated Rebalancing | **ROADMAP** | No rebalancing logic anywhere. Automated treasury action would be regulated-activity-adjacent — keep human-gated per the governance layer. |
 | Transparent Holdings Registry | **DOCUMENTED** | `holdings.nobleport.eth` is referenced in the README; no registry contract exists and the ENS name's contenthash is unverified. The attestation registry's evidence-bundle type (`NP-ATT-REG-003`) is the natural anchor format when built. |
@@ -54,6 +54,33 @@ this doc's commit, it is labeled target architecture. For the record:
   yield) — **a model portfolio**; no fund exists and no property is held.
 - "Token 2022 Integration" compliance claims — no Solana code exists;
   compliance hooks live in the ERC-1400 source.
+
+## Design review notes (external analysis, 2026-06-12)
+
+From an AI-assisted architecture review of the hybrid structure. These are
+design considerations for counsel and engineering — not legal conclusions.
+
+- **Roles in the hybrid model.** APs would interface between the
+  fiat/custody bank and on-chain minting; market makers could quote on both
+  traditional exchanges and DEXs; the custodian holds the underlying
+  property/REIT assets so investors are protected regardless of chain state.
+- **Official NAV stays off-chain.** A smart contract can publish an
+  oracle-fed *estimated* NAV in real time, but the official daily NAV should
+  remain off-chain for audit compliance. This bounds what "Smart Contract
+  NAV Calculation" can honestly claim.
+- **The redemption mechanism is the hard structural question.** How does an
+  AP redeem — does burning tokens release fiat from the custodian? That
+  on/off-ramp needs deep TradFi integration and touches the same money-
+  movement exposure flagged on `FiatRouter.sol` in the smart-contract
+  registry. Design this before writing any NAV or rebalancing code.
+- **Dual-class share treatment.** If NBPT issues a token class alongside a
+  traditional share class, SEC equal-treatment principles mean the token
+  class cannot offer better liquidity or lower fees outside the prospectus.
+  This constrains the "Blockchain Benefits" marketing framing and is a
+  counsel question from day one.
+- **Holdings registry source of truth.** Real-time holdings transparency
+  should derive from the custodian's wallet or a verified data feed — not a
+  self-reported list — or it adds no trust over a web page.
 
 ## Build order that converts this from diagram to fact
 
