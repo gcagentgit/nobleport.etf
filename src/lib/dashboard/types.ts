@@ -498,6 +498,37 @@ export interface ModuleCatalog {
   modules: StephanieModuleRow[];
 }
 
+// ---------------------------------------------------------------------------
+// MCP Control Gateway
+// ---------------------------------------------------------------------------
+
+export interface GatewayToolRow {
+  server: string;
+  tool: string;
+  requiredScopes: string[];
+  risk: 'read' | 'write' | 'money' | 'deploy';
+  humanApproval: boolean;
+  bound: boolean;
+}
+
+export interface GatewayStageRow {
+  stage: string;
+  purpose: string;
+  failClosed: string;
+}
+
+export interface GatewayStatus {
+  generatedAt: string;
+  spine: string;
+  truthLabel: string;
+  auditChainIntact: boolean;
+  auditEntries: number;
+  pendingApprovals: number;
+  stages: GatewayStageRow[];
+  tools: GatewayToolRow[];
+  productionGates: string[];
+}
+
 export interface DashboardOverview {
   generatedAt: string;
   kpis: KpiTile[];

@@ -17,6 +17,7 @@ import type {
   Invoice,
   Job,
   KillSwitch,
+  GatewayStatus,
   KpiTile,
   ModuleCatalog,
   Permit,
@@ -158,7 +159,7 @@ export const getKpis = (): KpiTile[] => [
     deltaLabel: 'vs last',
     trend: 'up',
     health: 'healthy',
-    hint: '15 of 15 projects complete',
+    hint: '16 of 16 projects complete',
     href: '/dashboard/program',
     deploymentStatus: 'LIVE',
   },
@@ -1007,8 +1008,8 @@ export const getProgramReport = (): ProgramReport => ({
   generatedAt: NOW_ISO,
   generatedFrom: 'filesystem',
   summary: {
-    totalProjects: 15,
-    complete: 15,
+    totalProjects: 16,
+    complete: 16,
     inProgress: 0,
     planned: 0,
     overallCompletion: 1.0,
@@ -1016,7 +1017,7 @@ export const getProgramReport = (): ProgramReport => ({
   byCategory: [
     { category: 'Platform', projects: 3, completion: 1.0 },
     { category: 'Revenue', projects: 2, completion: 1.0 },
-    { category: 'Governance', projects: 3, completion: 1.0 },
+    { category: 'Governance', projects: 4, completion: 1.0 },
     { category: 'Construction', projects: 2, completion: 1.0 },
     { category: 'Real Estate', projects: 1, completion: 1.0 },
     { category: 'Tokenization', projects: 1, completion: 1.0 },
@@ -1025,11 +1026,11 @@ export const getProgramReport = (): ProgramReport => ({
     { category: 'Strategy', projects: 1, completion: 1.0 },
   ],
   dimensionCoverage: [
-    { dimension: 'backend', projects: 13 },
-    { dimension: 'api', projects: 10 },
-    { dimension: 'ui', projects: 9 },
-    { dimension: 'tests', projects: 9 },
-    { dimension: 'docs', projects: 8 },
+    { dimension: 'backend', projects: 14 },
+    { dimension: 'api', projects: 11 },
+    { dimension: 'ui', projects: 10 },
+    { dimension: 'tests', projects: 10 },
+    { dimension: 'docs', projects: 9 },
     { dimension: 'contract', projects: 2 },
   ],
   projects: [
@@ -1086,6 +1087,26 @@ export const getProgramReport = (): ProgramReport => ({
         { dimension: 'contract', label: 'Human approval gateway', satisfied: true, path: 'contracts/HumanApprovalGateway.sol' },
         { dimension: 'docs', label: 'Token + registry docs', satisfied: true, path: 'docs/tokenization/erc1400-nbpt-usdc.md' },
         { dimension: 'ui', label: 'Token integration hub', satisfied: true, path: 'src/components/StephanieAINetworkHub.tsx' },
+      ],
+    },
+    {
+      key: 'mcp_gateway',
+      name: 'MCP Control Gateway',
+      summary: 'Single control spine: Auth → Policy → Approval → Tool Call → Audit → Result.',
+      category: 'Governance',
+      owner: 'Cyborg.ai',
+      since: 'Gateway Spine',
+      completion: 1.0,
+      status: 'complete',
+      delivered: 5,
+      total: 5,
+      coverage: ['backend', 'api', 'ui', 'tests', 'docs'],
+      deliverables: [
+        { dimension: 'backend', label: 'Spine + auth + policy + approval + audit', satisfied: true, path: 'backend/gateway/spine.py' },
+        { dimension: 'api', label: 'Gateway API', satisfied: true, path: 'backend/api/gateway.py' },
+        { dimension: 'tests', label: 'Gateway tests', satisfied: true, path: 'backend/tests/test_gateway.py' },
+        { dimension: 'ui', label: 'Gateway dashboard', satisfied: true, path: 'src/app/dashboard/gateway/page.tsx' },
+        { dimension: 'docs', label: 'Gateway doc', satisfied: true, path: 'docs/gateway/control-spine.md' },
       ],
     },
     {
@@ -1335,7 +1356,7 @@ export const getProgramReport = (): ProgramReport => ({
 
 export const getSystemsRegistry = (): SystemsRegistry => ({
   generatedAt: NOW_ISO,
-  hardTruth: '9 of 73 systems are verified live by a named verifier (operator attestation or third-party telemetry). The count grows only through verification events — never by relabeling.',
+  hardTruth: '9 of 75 systems are verified live by a named verifier (operator attestation or third-party telemetry). The count grows only through verification events — never by relabeling.',
   controlTruthFloor: '0 external live nodes are controlled from chat. AI control covers coordination, drafting, audit, build specs, code generation, planning, and connected-tool actions only when authorized — never wallets, banks, validators, GPU clusters, payment rails, legal filings, or permits.',
   bankableCore: ['reg:construction_intake', 'reg:scope_estimate_engine', 'reg:proposal_generator', 'reg:awo_flow', 'reg:change_order_ledger', 'reg:invoice_payment_tracking', 'reg:hubspot_router', 'reg:permitstream', 'reg:gcagent_compliance', 'reg:production_board', 'reg:roofing_takeoff', 'reg:kuzo_dashboard'],
   claimedMetrics: [
@@ -1362,14 +1383,14 @@ export const getSystemsRegistry = (): SystemsRegistry => ({
     { systemKey: 'repo:mission_control', verifier: 'Vercel deployment telemetry (third party)', method: 'third_party_telemetry', verifiedAt: '2026-06-11', expiresAt: '2026-09-09' },
   ],
   summary: {
-    totalSystems: 73,
+    totalSystems: 75,
     verified: 9,
-    humanGated: 14,
-    byBucket: { verified: 9, staged: 48, claimed: 3, demo: 3, planned: 2, blocked: 4, legal_hold: 3, reference: 1 },
+    humanGated: 15,
+    byBucket: { verified: 9, staged: 50, claimed: 3, demo: 3, planned: 2, blocked: 4, legal_hold: 3, reference: 1 },
   },
   buckets: [
     { bucket: 'verified', definition: 'Verified live by a named, accountable verifier — operator attestation or independent telemetry. Never self-declared by the system itself.', promotionGate: 'Re-verify on a rolling basis; verification evidence expires.', count: 9 },
-    { bucket: 'staged', definition: 'Built and measurable — code, tests, and docs exist on disk — but not verified live in production.', promotionGate: 'Deploy to production and capture independent live telemetry.', count: 48 },
+    { bucket: 'staged', definition: 'Built and measurable — code, tests, and docs exist on disk — but not verified live in production.', promotionGate: 'Deploy to production and capture independent live telemetry.', count: 50 },
     { bucket: 'claimed', definition: "Self-declared status (e.g. a project's own status file). No independent telemetry or third-party evidence.", promotionGate: 'Obtain independent telemetry or third-party attestation; a self-declared status file can never promote itself.', count: 3 },
     { bucket: 'demo', definition: 'Simulation or demonstration output. Explicitly not production; safe for training, forecasting, and scenario planning.', promotionGate: 'Replace generated/demo data with real production records (real IDs, real transactions), then verify.', count: 3 },
     { bucket: 'planned', definition: 'Roadmap / backlog. Not built yet.', promotionGate: 'Build it: code + tests + docs on disk moves it to STAGED.', count: 2 },
@@ -1756,6 +1777,30 @@ export const getSystemsRegistry = (): SystemsRegistry => ({
       nextGate: 'Deploy to production and capture independent live telemetry.',
       source: 'declared:control-register-2026-06-11',
       humanApprovalRequired: false,
+      verifiedBy: null,
+    },
+    {
+      key: 'repo:mcp_gateway',
+      name: 'MCP Control Gateway',
+      category: 'Governance',
+      bucket: 'staged',
+      summary: 'Single control spine: Auth → Policy → Approval → Tool Call → Audit → Result.',
+      evidence: ['5/5 deliverables on disk (backend, api, ui, tests, docs)', 'measured by backend/program against the filesystem'],
+      nextGate: 'Deploy to production and capture independent live telemetry.',
+      source: 'measured:repo',
+      humanApprovalRequired: false,
+      verifiedBy: null,
+    },
+    {
+      key: 'mcp_control_gateway',
+      name: 'MCP Control Gateway (spine)',
+      category: 'Governance',
+      bucket: 'staged',
+      summary: 'The single source of control: Auth → Policy → Approval → Tool Call → Audit → Result.',
+      evidence: ['backend/gateway spine on disk; 17 tests (auth, deny-by-default, approval SoD, hash-chain audit)', 'Deny-by-default policy, separation-of-duties human gate, tamper-evident audit — all built', 'Production gates remain: OIDC/JWKS, mTLS, persisted audit, on-chain anchoring'],
+      nextGate: 'Wire real OIDC/JWKS verification, mTLS, and persisted/anchored audit; then verify live.',
+      source: 'measured:repo',
+      humanApprovalRequired: true,
       verifiedBy: null,
     },
     {
@@ -2330,6 +2375,45 @@ export const getModuleCatalog = (): ModuleCatalog => ({
     { key: 'fiat_router', name: 'FiatRouter', registerNum: 48, category: 'Payments', function: 'Stripe/Mercury → USDC routing concept', bucket: 'legal_hold', capabilities: ['specified'], existingBindings: [], bound: false, buildState: 'scaffold', humanGated: true },
     { key: 'stephanie_voice_video', name: 'Stephanie Voice & Video Layer', registerNum: 49, category: 'Platform', function: 'TTS, avatar, WebRTC, calls, video', bucket: 'staged', capabilities: ['voice_console', 'transcripts'], existingBindings: ['src/components/dashboard/VoiceConsole.tsx', 'src/app/dashboard/voice/page.tsx'], bound: true, buildState: 'bound', humanGated: false },
     { key: 'avatar_gpu_layer', name: 'Stephanie Avatar GPU Layer', registerNum: 50, category: 'Network', function: 'Voice/prosody, emotion, lip-sync, gesture, GPU optimization', bucket: 'claimed', capabilities: ['specified'], existingBindings: [], bound: false, buildState: 'scaffold', humanGated: false },
+  ],
+});
+
+// ---------------------------------------------------------------------------
+// MCP Control Gateway
+//
+// Mirrors backend/gateway status(). Swap point: fetch `${API_BASE}/gateway/status`.
+// ---------------------------------------------------------------------------
+
+export const getGatewayStatus = (): GatewayStatus => ({
+  generatedAt: NOW_ISO,
+  spine: 'Auth \u2192 Policy \u2192 Approval \u2192 Tool Call \u2192 Audit \u2192 Result',
+  truthLabel:
+    'Spine logic is real and tested; OIDC/JWKS, mTLS, persisted audit, and on-chain anchoring remain production gates.',
+  auditChainIntact: true,
+  auditEntries: 0,
+  pendingApprovals: 0,
+  stages: [
+    { stage: 'Auth', purpose: 'Verify signed token \u2192 scoped principal', failClosed: 'bad / expired / malformed token rejected' },
+    { stage: 'Policy', purpose: 'Deny-by-default allowlist + scope check', failClosed: 'unallowlisted server/tool or missing scope denied' },
+    { stage: 'Approval', purpose: 'Human gate for write / money / deploy', failClosed: 'requester cannot self-approve (separation of duties)' },
+    { stage: 'Tool Call', purpose: 'Run the bound handler', failClosed: 'no handler \u2192 NOT_EXECUTABLE, never a silent pass' },
+    { stage: 'Audit', purpose: 'Hash-chained tamper-evident log', failClosed: 'every stage, including denials, recorded' },
+    { stage: 'Result', purpose: 'Truth-tagged outcome to caller', failClosed: 'LIVE only on a real executed call' },
+  ],
+  tools: [
+    { server: 'github', tool: 'read_issues', requiredScopes: ['repo:read'], risk: 'read', humanApproval: false, bound: false },
+    { server: 'github', tool: 'create_pr', requiredScopes: ['repo:write'], risk: 'write', humanApproval: true, bound: false },
+    { server: 'mcp-router.nobleport.internal', tool: 'dashboard.read', requiredScopes: ['dash:read'], risk: 'read', humanApproval: false, bound: true },
+    { server: 'mcp-router.nobleport.internal', tool: 'estimate.draft', requiredScopes: ['estimate:write'], risk: 'write', humanApproval: false, bound: false },
+    { server: 'mcp-router.nobleport.internal', tool: 'payment.checkout.create', requiredScopes: ['pay:write'], risk: 'money', humanApproval: true, bound: false },
+    { server: 'mcp-router.nobleport.internal', tool: 'payment.payout', requiredScopes: ['pay:admin'], risk: 'money', humanApproval: true, bound: false },
+    { server: 'mcp-router.nobleport.internal', tool: 'deploy.release', requiredScopes: ['deploy:admin'], risk: 'deploy', humanApproval: true, bound: false },
+  ],
+  productionGates: [
+    'Real OIDC/JWKS token verification (currently shared-secret HMAC)',
+    'mTLS enforcement on outbound MCP calls',
+    'Persisted audit (Postgres/Supabase) + on-chain anchoring (IPFS/Arweave)',
+    'Live MCP router connectivity verification',
   ],
 });
 

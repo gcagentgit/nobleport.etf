@@ -253,6 +253,21 @@ PROGRAM: tuple[Project, ...] = (
         ),
     ),
     Project(
+        key="mcp_gateway",
+        name="MCP Control Gateway",
+        summary="Single control spine: Auth → Policy → Approval → Tool Call → Audit → Result.",
+        category=Category.GOVERNANCE,
+        owner="Cyborg.ai",
+        since="Gateway Spine",
+        deliverables=(
+            _d(Dimension.BACKEND, "Spine + auth + policy + approval + audit", "backend/gateway/spine.py", "backend/gateway/policy.py"),
+            _d(Dimension.API, "Gateway API", "backend/api/gateway.py"),
+            _d(Dimension.TESTS, "Gateway tests", "backend/tests/test_gateway.py"),
+            _d(Dimension.UI, "Gateway dashboard", "src/app/dashboard/gateway/page.tsx"),
+            _d(Dimension.DOCS, "Gateway doc", "docs/gateway/control-spine.md"),
+        ),
+    ),
+    Project(
         key="stephanie_modules",
         name="Stephanie.ai Module Framework",
         summary="50-module execution framework: governed routing, gates, decision chain.",

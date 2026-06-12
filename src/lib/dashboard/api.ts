@@ -16,6 +16,7 @@ import {
   getInvoices as mockInvoices,
   getJobs as mockJobs,
   getKillSwitches as mockKillSwitches,
+  getGatewayStatus as mockGateway,
   getKpis as mockKpis,
   getModuleCatalog as mockModules,
   getOverview as mockOverview,
@@ -42,6 +43,7 @@ export const fetchSalesIntelligence = async () => mockSales();
 export const fetchProgramReport = async () => mockProgram();
 export const fetchSystemsRegistry = async () => mockSystems();
 export const fetchModuleCatalog = async () => mockModules();
+export const fetchGatewayStatus = async () => mockGateway();
 export const fetchJobs = async () => mockJobs();
 export const fetchPermits = async () => mockPermits();
 export const fetchPermitForecast = async () => mockPermitForecast();

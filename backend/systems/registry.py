@@ -195,6 +195,21 @@ DECLARED_NODES: tuple[SystemNode, ...] = (
         human_approval_required=True,
     ),
     SystemNode(
+        key="mcp_control_gateway",
+        name="MCP Control Gateway (spine)",
+        category="Governance",
+        bucket=TruthBucket.STAGED,
+        summary="The single source of control: Auth → Policy → Approval → Tool Call → Audit → Result.",
+        evidence=(
+            "backend/gateway spine on disk; 17 tests (auth, deny-by-default, approval SoD, hash-chain audit)",
+            "Deny-by-default policy, separation-of-duties human gate, tamper-evident audit — all built",
+            "Production gates remain: OIDC/JWKS, mTLS, persisted audit, on-chain anchoring",
+        ),
+        next_gate="Wire real OIDC/JWKS verification, mTLS, and persisted/anchored audit; then verify live.",
+        source="measured:repo",
+        human_approval_required=True,
+    ),
+    SystemNode(
         key="truth_inventory_workbook",
         name="200-Module Truth Inventory Workbook",
         category="Strategy",
