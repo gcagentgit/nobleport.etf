@@ -1,11 +1,17 @@
 """
 CYBORG.IO — Quantum Threat Intelligence Module
 Based on: Top Quantum-Attack Scenarios and Protective Measures (2025)
+Source corpus + primary-source citations: docs/quantum-attack-tests-2025.md
+(PDF on file at docs/quantum-attack-tests-2025.pdf)
 Evaluates the NoblePort/CYBORG.IO platform's cryptographic posture
 against 10 documented quantum attack vectors.
 """
 from __future__ import annotations
 from typing import Any
+
+# Where the underlying research, metrics, and citations live. Served in the
+# summary so dashboard consumers can trace every figure to its source.
+SOURCE_DOCUMENT = "cyborg/nvapi/docs/quantum-attack-tests-2025.md"
 
 # ─── Threat Matrix ─────────────────────────────────────────────────────────────
 # Each entry maps the PDF's attack scenarios to CYBORG.IO platform context.
@@ -218,6 +224,7 @@ def get_threat_summary() -> dict[str, Any]:
         "max_risk_score": max_risk,
         "critical_action_items": len(critical_threats),
         "top_priority": THREAT_MATRIX[1]["attack"],  # ECC/ECDSA — highest exposure for crypto platform
+        "source_document": SOURCE_DOCUMENT,
     }
 
 

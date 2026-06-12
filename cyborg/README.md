@@ -23,6 +23,8 @@ FastAPI gateway in front of NVIDIA NIM (`integrate.api.nvidia.com`):
 - **Quantum threat intel:** `/quantum/*` serves a static 10-vector attack
   matrix (Shor's, Grover's, harvest-now/decrypt-later, …) built from 2025
   NIST/IETF/Gidney research, with per-vector NoblePort exposure notes.
+  Source corpus and primary citations:
+  [`nvapi/docs/quantum-attack-tests-2025.md`](./nvapi/docs/quantum-attack-tests-2025.md).
 
 See [`nvapi/README.md`](./nvapi/README.md) for quick start, the full endpoint
 table, and production notes (AppRole auth, TLS, rate limiting).
