@@ -9,6 +9,10 @@
 // ─── Enums ────────────────────────────────────────────────────────────
 export { RevenueLoopStage } from './types';
 
+// ─── App Registry ─────────────────────────────────────────────────────
+export { APP_REGISTRY, OS_PRINCIPLES, appsByOffice, appStatusSummary } from './apps';
+export type { NoblePortApp, AppOffice, AppStatus } from './apps';
+
 // ─── Type-only re-exports ─────────────────────────────────────────────
 export type {
   // Revenue Loop

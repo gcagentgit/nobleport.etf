@@ -12,6 +12,7 @@ interface NavItem {
 const PRIMARY: NavItem[] = [
   { href: '/dashboard', label: 'Command', hint: 'Executive overview' },
   { href: '/dashboard/snapshot', label: 'Snapshot', hint: 'Stephanie · measured one-pager' },
+  { href: '/dashboard/apps', label: 'Apps', hint: 'NoblePort OS · module stack' },
   { href: '/dashboard/revenue', label: 'Revenue', hint: 'Warboard · cash · AR' },
   { href: '/dashboard/jobs', label: 'Jobs', hint: 'GCagent · production' },
   { href: '/dashboard/permits', label: 'Permits', hint: 'PermitStream · AHJs' },
