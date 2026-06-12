@@ -1,0 +1,68 @@
+# NBPT ETF Structure — Build-State Map v1
+
+**Purpose:** The README's ETF architecture diagram, mapped component-by-
+component to what actually exists. Same discipline as the
+[Smart Contract Registry](./smart-contract-registry.md) and the
+[Attestation Registry](../governance/attestation-registry-v1.md).
+
+**Date:** 2026-06-12
+**Not legal advice. Not an investment representation. Nothing here is an
+offer of securities.**
+
+> **Bottom line up front:** The NBPT ETF is **target architecture**. No SEC
+> filing exists, no Authorized Participant / market-maker / custodian
+> relationship exists, no fund holds any property, and 0 contracts are
+> deployed. The one genuinely built piece is the ERC-1400 token source
+> (subscription/redemption, counsel-gated). The diagram also carries an
+> unresolved chain conflict: it says **Token 2022** (Solana) while the
+> implemented token is **ERC-1400** (EVM) — reconcile before any external use.
+
+## Traditional ETF wrapper
+
+| Component | Status | Reality |
+|-----------|--------|---------|
+| SEC Registration (1940 Act) | **ROADMAP** | No registration statement filed or drafted. The 1940 Act exposure is already flagged on `NPETF.sol` in the smart-contract registry. Counsel-gated — same Cooley gate as the token offering. |
+| Authorized Participants | **ROADMAP** | No AP agreements exist. Requires a registered fund first. |
+| Market Makers | **ROADMAP** | No market-making relationships. Requires a listed product first. |
+| Custodian Bank | **ROADMAP** | No custodian engaged. The "Custodian Bridge" (key custody, multi-sig) has no code in the repo. |
+
+## Blockchain layer
+
+| Component | Status | Reality |
+|-----------|--------|---------|
+| Token 2022 Asset Backing | **DOCUMENTED — chain conflict** | Token-2022 is a *Solana* token program. The implemented token is `contracts/NBPTSecurityToken1400.sol` (ERC-1400, EVM, source-only, not deployed). Either the diagram should say ERC-1400, or a Solana implementation must be built from scratch. **Recommendation: reconcile to ERC-1400** — it exists, has the compliance hooks (transfer restrictions, `liveOfferingCleared`), and matches every other tokenization doc in this repo. |
+| Smart Contract NAV Calculation | **DOCUMENTED** | No NAV contract or oracle integration code exists. `NPETF.sol` is named in docs with no source. The "Oracle Network" (Chainlink feeds, valuation) has zero integration code. |
+| Automated Rebalancing | **ROADMAP** | No rebalancing logic anywhere. Automated treasury action would be regulated-activity-adjacent — keep human-gated per the governance layer. |
+| Transparent Holdings Registry | **DOCUMENTED** | `holdings.nobleport.eth` is referenced in the README; no registry contract exists and the ENS name's contenthash is unverified. The attestation registry's evidence-bundle type (`NP-ATT-REG-003`) is the natural anchor format when built. |
+
+## Integration components (README §Architecture)
+
+| Component | Status | Reality |
+|-----------|--------|---------|
+| Oracle Network | **ROADMAP** | No Chainlink or valuation-feed code. |
+| Custodian Bridge | **ROADMAP** | No custody or multi-sig bridge code. (Nemoclaw has multi-sig *workflow* types in `src/lib/nemoclaw/`, INTERNAL_R&D.) |
+| Creation / Redemption | **PARTIAL** | `NBPTSecurityToken1400.sol` implements USDC subscription/redemption at the token level — source-only, hard-gated by `liveOfferingCleared`. The AP portal and settlement layers do not exist. |
+| Reporting Infrastructure | **PARTIAL** | The dashboard exists and now includes the measured Executive Snapshot page; fund-style NAV publication and regulatory filing automation do not exist. |
+
+## README claims corrected
+
+The README previously presented several aspirational items as fact. As of
+this doc's commit, it is labeled target architecture. For the record:
+
+- "SEC-registered investment vehicle" — **no registration exists**.
+- "Initial Holdings" ($4.4M across Miami/Austin/Denver, 9.2% projected
+  yield) — **a model portfolio**; no fund exists and no property is held.
+- "Token 2022 Integration" compliance claims — no Solana code exists;
+  compliance hooks live in the ERC-1400 source.
+
+## Build order that converts this from diagram to fact
+
+1. **Counsel** scopes the wrapper question (1940 Act fund vs. Reg D fund vs.
+   simpler tokenized-parcel SPVs first — the land-parcel playbook is the
+   lowest-regulatory-drag on-ramp and already written).
+2. **Reconcile the token standard** to ERC-1400 across README and docs.
+3. **Testnet-deploy** `NBPTSecurityToken1400.sol` — first on-chain anchor.
+4. **Holdings registry**: a minimal contract anchoring property evidence
+   bundles (deeds, appraisals) by hash — feeds both "Transparent Holdings"
+   and the attestation registry.
+5. **NAV oracle**: only after real holdings exist to value.
