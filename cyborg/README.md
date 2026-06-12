@@ -37,6 +37,16 @@ HTTP/WebSocket → Riva gRPC bridge for NVIDIA Nemotron ASR:
 - `WS /ws/transcribe` for real-time mic streaming (16 kHz mono PCM).
 - Runs alongside the Riva ASR NIM container (`docker compose up`).
 
+### `site/` — cyborg.io internal status site
+Static site (no build step) for the Cyborg.ai security surface. Notably it
+already follows the repo's truth discipline in its copy: hero and KPI
+sections are labeled "in active development, not yet in production,"
+validator-mesh numbers are marked "placeholder targets, not measurements,"
+and uptime/incident stats say "no production telemetry." An injected
+third-party preview-harness script (screenshot capture + postMessage to the
+site builder's origins) was stripped before committing. Open
+`site/index.html` directly or serve the directory statically.
+
 ## How this maps to the ecosystem
 
 | This code | Ecosystem touchpoint |
