@@ -16,6 +16,24 @@ behind the Cooley gate.**
 | NBPT security token | EVM (Ethereum/Arbitrum target) | ERC-1400, white-label | `contracts/NBPTSecurityToken1400.sol` | **IMPLEMENTED** (source only; `liveOfferingCleared == false`) |
 | Real estate utility/settlement token | Solana | Token-2022 (Token Extensions) | none — to be built | **ROADMAP** |
 
+### Claimed Solana address (operator-provided, 2026-06-12)
+
+```
+74UMoemiriRqwLAGnJDnpLXJrWHX5XRs3rM4gWboUMQ8
+```
+
+Validated as a well-formed base58 32-byte Solana public key. **Everything
+else about it is unverified:** ownership, on-chain existence, balance, and
+role (operator wallet vs. intended mint authority vs. something else) — the
+sandbox's network policy blocks Solana RPC, so no on-chain lookup was
+performed. Same discipline as the ENS wallet record (`NP-ATT-IDN-002`,
+SELF_ASSERTED): to verify, (1) sign an ed25519 challenge message from this
+key and file the signature, and (2) record an explorer link
+(`https://solscan.io/account/74UMoemiriRqwLAGnJDnpLXJrWHX5XRs3rM4gWboUMQ8`)
+showing the expected state. Until then this address must not be presented
+as a verified NoblePort asset or used as a payment destination in any
+external material.
+
 Division of labor, as intended:
 
 - **ERC-1400 NBPT** is the *security* leg: partitioned ownership, transfer
