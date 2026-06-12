@@ -13,9 +13,12 @@ offer of securities.**
 > filing exists, no Authorized Participant / market-maker / custodian
 > relationship exists, no fund holds any property, and 0 contracts are
 > deployed. The one genuinely built piece is the ERC-1400 token source
-> (subscription/redemption, counsel-gated). The diagram also carries an
-> unresolved chain conflict: it says **Token 2022** (Solana) while the
-> implemented token is **ERC-1400** (EVM) — reconcile before any external use.
+> (subscription/redemption, counsel-gated). The architecture is
+> **dual-token by design** — ERC-1400 NBPT on EVM *and* a Solana Token-2022
+> real estate token, joined by a hybrid exchange layer — per the operator's
+> 2026-06-12 clarification. The EVM leg has source; the Solana leg and the
+> exchange layer have none. See the
+> [dual-token hybrid exchange spec](./dual-token-hybrid-exchange.md).
 
 ## Traditional ETF wrapper
 
@@ -30,7 +33,7 @@ offer of securities.**
 
 | Component | Status | Reality |
 |-----------|--------|---------|
-| Token 2022 Asset Backing | **DOCUMENTED — chain conflict** | Token-2022 is a *Solana* token program (Token Extensions: transfer fees, interest-bearing mechanics, confidential transfers encodable in token metadata). The implemented token is `contracts/NBPTSecurityToken1400.sol` (ERC-1400, EVM, source-only, not deployed). Either the diagram should say ERC-1400, or a Solana implementation must be built from scratch. **Recommendation: reconcile to ERC-1400** — it exists, has the compliance hooks (transfer restrictions, `liveOfferingCleared`), and matches every other tokenization doc in this repo. Token-2022's native extensions are genuinely attractive for fee/confidentiality mechanics, but choosing Solana means rebuilding the compliance layer from zero. Chain decision is Michael's call. |
+| Token 2022 Asset Backing | **Dual-token by design** | Two tokens are intended: (1) `contracts/NBPTSecurityToken1400.sol` — ERC-1400 white-label NBPT, EVM, **IMPLEMENTED** source, not deployed, counsel-gated; (2) a Solana Token-2022 real estate token using Token Extensions (transfer fees, metadata, transfer-hook compliance, confidential transfers) — **ROADMAP**, zero Solana code in the repo. The legs are joined by a hybrid exchange layer (**ROADMAP**). Spec: [dual-token-hybrid-exchange.md](./dual-token-hybrid-exchange.md). |
 | Smart Contract NAV Calculation | **DOCUMENTED** | No NAV contract or oracle integration code exists. `NPETF.sol` is named in docs with no source. The "Oracle Network" (Chainlink feeds, valuation) has zero integration code. |
 | Automated Rebalancing | **ROADMAP** | No rebalancing logic anywhere. Automated treasury action would be regulated-activity-adjacent — keep human-gated per the governance layer. |
 | Transparent Holdings Registry | **DOCUMENTED** | `holdings.nobleport.eth` is referenced in the README; no registry contract exists and the ENS name's contenthash is unverified. The attestation registry's evidence-bundle type (`NP-ATT-REG-003`) is the natural anchor format when built. |
