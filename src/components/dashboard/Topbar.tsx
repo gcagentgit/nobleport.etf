@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
+import { ConnectWalletButton } from '@/components/wallet/ConnectWalletButton';
+
 const fmt = (d: Date) =>
   d.toLocaleString('en-US', {
     weekday: 'short',
@@ -42,6 +44,7 @@ export function Topbar({ pageTitle, generatedAt }: { pageTitle: string; generate
         <button type="button" className="btn" aria-label="Refresh">
           ↻ <span className="hidden sm:inline">Refresh</span>
         </button>
+        <ConnectWalletButton />
         <button type="button" className="btn-primary" aria-label="Operator">
           OP · m.velasquez
         </button>
