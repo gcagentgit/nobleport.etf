@@ -13,6 +13,17 @@ export { RevenueLoopStage } from './types';
 export { APP_REGISTRY, OS_PRINCIPLES, appsByOffice, appStatusSummary } from './apps';
 export type { NoblePortApp, AppOffice, AppStatus } from './apps';
 
+// ─── Kuzo Avatar Interface ────────────────────────────────────────────
+export {
+  KUZO_BRAND_DIRECTION,
+  KUZO_CAPABILITIES,
+  KUZO_HARD_BOUNDARIES,
+  KUZO_OPERATING_SCRIPT,
+  KUZO_PRESENCES,
+  KUZO_VARIANTS,
+} from './kuzo';
+export type { KuzoPresence, KuzoVariant } from './kuzo';
+
 // ─── Type-only re-exports ─────────────────────────────────────────────
 export type {
   // Revenue Loop

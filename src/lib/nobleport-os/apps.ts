@@ -210,6 +210,14 @@ export const APP_REGISTRY: NoblePortApp[] = [
     status: 'staged',
     surfaces: ['/dashboard/agents', 'backend/agents/orchestrator.py', 'backend/governance/stephanie_gate.py (HITL enforced)'],
   },
+  {
+    id: 'kuzo',
+    name: 'Kuzo Avatar Interface',
+    office: 'Platform',
+    purpose: 'Branded AI avatar/mascot communication layer — explains, narrates, routes; hard-bounded from payments, contracts, AWOs, permits, legal, and engineering',
+    status: 'planned',
+    surfaces: ['src/lib/nobleport-os/kuzo.ts (brand + boundaries locked; no avatar runtime yet)'],
+  },
 ];
 
 /** One login. One client record. One job file. One ledger. */
