@@ -17,6 +17,7 @@ const PRIMARY: NavItem[] = [
   { href: '/dashboard/jobs', label: 'Jobs', hint: 'GCagent · production' },
   { href: '/dashboard/permits', label: 'Permits', hint: 'PermitStream · AHJs' },
   { href: '/dashboard/roofing', label: 'Roofing', hint: 'Fall protection · safety gates' },
+  { href: '/dashboard/design-build', label: 'Design-Build', hint: 'One team · 7-step method' },
   { href: '/dashboard/realty', label: 'Realty', hint: 'Property analysis · assets' },
   { href: '/dashboard/agents', label: 'Agents', hint: 'AI mesh · queues' },
   { href: '/dashboard/voice', label: 'Voice', hint: 'Stephanie console' },

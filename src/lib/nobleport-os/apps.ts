@@ -161,6 +161,14 @@ export const APP_REGISTRY: NoblePortApp[] = [
 
   // ── Business Units ──────────────────────────────────────────────────
   {
+    id: 'design-build',
+    name: 'Design & Build App',
+    office: 'Business Units',
+    purpose: 'Design-build delivery: one team, one contract — discovery through warranty via the 7-step NoblePort Method',
+    status: 'staged',
+    surfaces: ['/dashboard/design-build', 'src/lib/design-build/method.ts'],
+  },
+  {
     id: 'roofing-division',
     name: 'Roofing Division App',
     office: 'Business Units',
