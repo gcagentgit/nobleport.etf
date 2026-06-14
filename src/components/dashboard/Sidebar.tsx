@@ -18,6 +18,7 @@ const PRIMARY: NavItem[] = [
   { href: '/dashboard/realty', label: 'Realty', hint: 'Property analysis · assets' },
   { href: '/dashboard/agents', label: 'Agents', hint: 'AI mesh · queues' },
   { href: '/dashboard/voice', label: 'Voice', hint: 'Stephanie console' },
+  { href: '/dashboard/wallet', label: 'Wallet', hint: 'nobleport.base.eth · Web3' },
   { href: '/dashboard/compliance', label: 'Compliance', hint: 'Cyborg · kill switches' },
   { href: '/dashboard/audit', label: 'Audit', hint: 'Hash-linked chain' },
 ];
