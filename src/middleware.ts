@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+const AUTH_GATE_ENABLED = process.env.NOBLEPORT_AUTH_GATE === 'true';
+
 const PUBLIC_PATHS = new Set(['/', '/_next', '/api/health', '/favicon.ico']);
 
 function isPublicPath(pathname: string): boolean {
@@ -17,14 +19,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const authToken = request.cookies.get('nobleport_session')?.value;
-  const apiKey = request.headers.get('x-api-key');
+  if (AUTH_GATE_ENABLED) {
+    const authToken = request.cookies.get('nobleport_session')?.value;
+    const apiKey = request.headers.get('x-api-key');
 
-  if (pathname.startsWith('/admin/') || pathname.startsWith('/dashboard/')) {
-    if (!authToken && !apiKey) {
-      const loginUrl = new URL('/', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(loginUrl);
+    if (pathname.startsWith('/admin/') || pathname.startsWith('/dashboard/')) {
+      if (!authToken && !apiKey) {
+        const loginUrl = new URL('/', request.url);
+        loginUrl.searchParams.set('redirect', pathname);
+        return NextResponse.redirect(loginUrl);
+      }
     }
   }
 
