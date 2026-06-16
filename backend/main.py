@@ -37,6 +37,7 @@ from backend.api.governance import router as governance_router
 from backend.api.learning import router as learning_router
 from backend.config.database import init_db
 from backend.config.settings import settings
+from backend.core.secrets import build_secrets_manager, set_secrets_manager
 from backend.services.sync_engine import SyncEngine
 from backend.services.hubspot_sync import HubSpotSyncService
 from backend.agents.orchestrator import AgentMesh
@@ -47,6 +48,27 @@ import backend.models  # noqa: F401 - ensure all models registered with Base
 async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle."""
     await init_db()
+
+    # Secrets startup gate (Secrets Management Policy v1.0, section 9):
+    # fail fast if required secrets are missing, malformed, or overdue for
+    # rotation. In production a failing gate aborts the boot.
+    import logging
+
+    secrets_manager = build_secrets_manager()
+    set_secrets_manager(secrets_manager)
+    app.state.secrets = secrets_manager
+    report = secrets_manager.validate_startup(
+        block_on_overdue=settings.secrets_block_on_overdue_rotation
+    )
+    if not report.ok:
+        logging.getLogger("nobleport.secrets").error(
+            "secrets_startup_gate_failed", extra={"report": report.as_dict()}
+        )
+        if settings.environment.value == "production":
+            raise RuntimeError(
+                f"Secrets startup gate failed: {report.as_dict()}. "
+                "Resolve missing/invalid/overdue secrets or set an explicit override."
+            )
 
     sync_engine = SyncEngine()
     app.state.sync_engine = sync_engine

@@ -24,6 +24,13 @@ class SyncMode(str, Enum):
     REALTIME = "realtime"
 
 
+class SecretsProviderKind(str, Enum):
+    ENV = "env"
+    AWS = "aws"
+    GCP = "gcp"
+    VAULT = "vault"
+
+
 class Settings(BaseSettings):
     # Application
     app_name: str = "NoblePort Backend"
@@ -83,6 +90,28 @@ class Settings(BaseSettings):
     # Stephanie.ai MCP Connection
     stephanie_mcp_endpoint: str = "http://localhost:3100/mcp"
     stephanie_api_key: Optional[str] = None
+
+    # Secrets Management (Secrets Management Policy v1.0)
+    # Production must use a managed provider; env is local-development only.
+    secrets_provider: SecretsProviderKind = SecretsProviderKind.ENV
+    secrets_block_on_overdue_rotation: bool = True
+    # AWS Secrets Manager
+    aws_region: Optional[str] = None
+    aws_secrets_prefix: str = "nobleport/prod/"
+    # GCP Secret Manager
+    gcp_project_id: Optional[str] = None
+    # HashiCorp Vault
+    vault_addr: Optional[str] = None
+    vault_mount_point: str = "secret"
+    vault_base_path: str = "nobleport/prod"
+
+    # Inventoried external-data / crypto secrets (env-resolved in local dev)
+    finnhub_api_key: Optional[str] = None
+    coingecko_api_key: Optional[str] = None
+    alpha_vantage_key: Optional[str] = None
+    paypal_client_id: Optional[str] = None
+    paypal_secret: Optional[str] = None
+    encryption_key: Optional[str] = None
 
     # CORS
     cors_origins: list[str] = Field(
