@@ -577,6 +577,9 @@ class PaymentResponse(BaseModel):
     stripe_payment_intent_id: Optional[str]
     stripe_checkout_session_id: Optional[str]
     stripe_charge_id: Optional[str]
+    paypal_order_id: Optional[str] = None
+    paypal_capture_id: Optional[str] = None
+    payment_method: Optional[str] = None
     paid_at: Optional[datetime]
     failed_at: Optional[datetime]
     description: Optional[str]

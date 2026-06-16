@@ -35,6 +35,8 @@ class PaymentStatus(str, PyEnum):
 
 class PaymentProcessor(str, PyEnum):
     STRIPE = "stripe"
+    PAYPAL = "paypal"
+    VENMO = "venmo"
     ACH = "ach"
     CHECK = "check"
     WIRE = "wire"
@@ -83,6 +85,18 @@ class Payment(Base, UUIDMixin, TimestampMixin):
     stripe_charge_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True
     )
+
+    # PayPal / Venmo-specific (PayPal processes Venmo as a funding source)
+    paypal_order_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, unique=True
+    )
+    paypal_capture_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
+
+    # Funding source / wallet recorded by the processor
+    # (e.g. "card", "venmo", "paypal", "apple_pay", "ach").
+    payment_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Timestamps
     paid_at: Mapped[str | None] = mapped_column(

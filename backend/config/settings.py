@@ -48,6 +48,17 @@ class Settings(BaseSettings):
     stripe_cancel_url: str = "http://localhost:3000/payment/cancel"
     stripe_default_deposit_percent: float = 30.0
 
+    # PayPal / Venmo Integration
+    # PayPal Checkout processes PayPal balance, Venmo, and card funding sources.
+    # Kept fully independent of Stripe — both processors settle into the
+    # NoblePort Payment Node rather than routing money through each other.
+    paypal_client_id: Optional[str] = None
+    paypal_client_secret: Optional[str] = None
+    paypal_webhook_id: Optional[str] = None
+    paypal_environment: str = "sandbox"  # "sandbox" | "live"
+    paypal_success_url: str = "http://localhost:3000/payment/success"
+    paypal_cancel_url: str = "http://localhost:3000/payment/cancel"
+
     # HubSpot Integration
     hubspot_api_key: Optional[str] = None
     hubspot_access_token: Optional[str] = None

@@ -26,8 +26,9 @@ from backend.config.database import async_session
 from backend.config.settings import settings
 from backend.models.change_order import ChangeOrder, ChangeOrderStatus
 from backend.models.estimate import Estimate, EstimateStatus
-from backend.models.job import Job, JobStatus
+from backend.models.job import Job
 from backend.models.payment import Payment, PaymentProcessor, PaymentStatus, PaymentType
+from backend.services.payment_node import PaymentNode
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class StripeService:
         self.webhook_secret = settings.stripe_webhook_secret
         self.success_url = settings.stripe_success_url
         self.cancel_url = settings.stripe_cancel_url
+        self.node = PaymentNode()
 
     # =========================================================================
     # CHECKOUT SESSION CREATION
@@ -347,82 +349,24 @@ class StripeService:
             payment = result.scalar_one_or_none()
 
             if not payment:
-                # Create payment record if not found
+                # Create payment record if the pending one wasn't found.
                 payment = Payment(
                     job_id=job_id,
                     change_order_id=change_order_id,
                     payment_type=PaymentType(payment_type),
-                    status=PaymentStatus.PAID,
+                    status=PaymentStatus.PENDING,
                     amount=session_obj.get("amount_total", 0) / 100,
                     processor=PaymentProcessor.STRIPE,
-                    stripe_payment_intent_id=payment_intent_id,
-                    stripe_checkout_session_id=session_id,
-                    paid_at=datetime.now(timezone.utc),
                 )
                 db.add(payment)
-            else:
-                payment.status = PaymentStatus.PAID
-                payment.stripe_payment_intent_id = payment_intent_id
-                payment.stripe_checkout_session_id = session_id
-                payment.paid_at = datetime.now(timezone.utc)
+                await db.flush()
 
-            # Update job financials
-            job_result = await db.execute(select(Job).where(Job.id == job_id))
-            job = job_result.scalar_one_or_none()
+            payment.stripe_payment_intent_id = payment_intent_id
+            payment.stripe_checkout_session_id = session_id
 
-            if job:
-                paid_amount = payment.amount
-
-                if payment_type == "deposit":
-                    job.deposit_paid += paid_amount
-                    job.deposit_paid_at = datetime.now(timezone.utc)
-
-                    # DEPOSIT GATE: pass if deposit meets or exceeds required
-                    if job.deposit_paid >= job.deposit_required:
-                        job.deposit_gate_passed = True
-                        if job.status == JobStatus.PENDING_DEPOSIT:
-                            job.status = JobStatus.SCHEDULED
-                        logger.info(
-                            f"Deposit gate PASSED for job {job.job_number}. "
-                            f"Paid: ${job.deposit_paid:,.2f} / Required: ${job.deposit_required:,.2f}"
-                        )
-
-                job.total_paid += paid_amount
-
-                # Recalculate margin
-                if job.contract_value > 0:
-                    job.margin = job.total_paid - job.total_costs
-                    job.margin_percent = (
-                        (job.margin / job.contract_value) * 100
-                        if job.contract_value > 0
-                        else 0
-                    )
-
-            # Update change order if applicable
-            if change_order_id:
-                co_result = await db.execute(
-                    select(ChangeOrder).where(ChangeOrder.id == change_order_id)
-                )
-                co = co_result.scalar_one_or_none()
-                if co:
-                    co.amount_paid += paid_amount
-                    if co.amount_paid >= co.total_amount:
-                        co.fully_paid = True
-
-                    # Update job change order totals
-                    if job:
-                        job.change_order_total += paid_amount
-
-            await db.commit()
-
-            return {
-                "status": "success",
-                "payment_type": payment_type,
-                "job_id": job_id,
-                "amount": payment.amount,
-                "deposit_gate_passed": job.deposit_gate_passed if job else None,
-                "job_status": job.status.value if job else None,
-            }
+            # Settle through the unified NoblePort Payment Node so the deposit
+            # gate and ledger update identically across every processor.
+            return await self.node.apply_settlement(db, payment)
 
     async def _handle_payment_succeeded(
         self, data: dict[str, Any]

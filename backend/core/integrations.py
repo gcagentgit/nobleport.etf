@@ -6,7 +6,8 @@ integrations:
 
   - HubSpot (CRM / lead sync)
   - Google Calendar (scheduling)
-  - Stripe (deposits / payments)
+  - Stripe (deposits / payments — primary construction processor)
+  - PayPal / Venmo (consumer-convenience processor)
   - CostCertified (estimating bridge)
   - Buildertrend (field operations)
 
@@ -176,6 +177,13 @@ class IntegrationRegistry:
         self.register(IntegrationConnector(
             name="Stripe Payments",
             service="stripe",
+            status=IntegrationStatus.NOT_CONFIGURED,
+            sync_interval_seconds=120,
+        ))
+
+        self.register(IntegrationConnector(
+            name="PayPal / Venmo Checkout",
+            service="paypal",
             status=IntegrationStatus.NOT_CONFIGURED,
             sync_interval_seconds=120,
         ))

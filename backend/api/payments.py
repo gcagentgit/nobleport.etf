@@ -12,10 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.api.schemas import PaginatedResponse, PaymentResponse
 from backend.config.database import get_db
 from backend.models.payment import Payment, PaymentStatus, PaymentType
+from backend.services.paypal_service import PayPalService
 from backend.services.stripe_service import StripeService
 
 router = APIRouter()
 stripe_service = StripeService()
+paypal_service = PayPalService()
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -112,7 +114,54 @@ async def create_change_order_checkout(
 
 
 # =========================================================================
-# STRIPE WEBHOOK
+# PAYPAL / VENMO CHECKOUT ENDPOINTS
+# =========================================================================
+#
+# PayPal Checkout is the secondary, consumer-convenience processor. It runs
+# fully independently of Stripe — both settle into the NoblePort Payment Node
+# rather than routing money through one another.
+
+
+@router.post("/paypal/order/deposit")
+async def create_paypal_deposit_order(
+    job_id: str, db: AsyncSession = Depends(get_db)
+):
+    """Create a PayPal order for a job deposit (PayPal/Venmo/card funded)."""
+    result = await paypal_service.create_deposit_order(job_id, db)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/paypal/order/progress")
+async def create_paypal_progress_order(
+    job_id: str,
+    amount: float,
+    description: str = "Progress payment",
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a PayPal order for a progress payment."""
+    result = await paypal_service.create_progress_order(
+        job_id, amount, description, db
+    )
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/paypal/order/change-order")
+async def create_paypal_change_order_order(
+    change_order_id: str, db: AsyncSession = Depends(get_db)
+):
+    """Create a PayPal order for a change order (AWO) payment."""
+    result = await paypal_service.create_change_order_order(change_order_id, db)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+# =========================================================================
+# WEBHOOKS
 # =========================================================================
 
 
@@ -140,4 +189,30 @@ async def stripe_webhook(request: Request):
     event_data = event.get("data", {})
 
     result = await stripe_service.handle_webhook_event(event_type, event_data)
+    return result
+
+
+@router.post("/webhook/paypal")
+async def paypal_webhook(request: Request):
+    """
+    PayPal webhook endpoint. Verifies the transmission and processes events.
+    Settled captures feed the same deposit gate and ledger as Stripe via the
+    NoblePort Payment Node.
+    """
+    payload = await request.body()
+
+    if paypal_service.webhook_id:
+        if not paypal_service.verify_webhook_signature(dict(request.headers)):
+            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    try:
+        import json
+        event = json.loads(payload)
+    except (json.JSONDecodeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    event_type = event.get("event_type", "")
+    resource = event.get("resource", {})
+
+    result = await paypal_service.handle_webhook_event(event_type, resource)
     return result
