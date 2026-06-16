@@ -34,6 +34,7 @@ from backend.api.dashboard import router as dashboard_router
 from backend.api.trust import router as trust_router
 from backend.api.ops_brief import router as ops_brief_router
 from backend.api.governance import router as governance_router
+from backend.api.learning import router as learning_router
 from backend.config.database import init_db
 from backend.config.settings import settings
 from backend.services.sync_engine import SyncEngine
@@ -76,8 +77,9 @@ app = FastAPI(
         "AI-operated infrastructure for construction, permitting, estimating, "
         "compliance, payments, and project execution. Powered by Stephanie.ai "
         "(intake/routing), GCagent.ai (construction execution), PermitStream.ai "
-        "(permit/compliance), Cyborg.ai (security/governance), and AuditBeacon "
-        "(immutable operational memory)."
+        "(permit/compliance), Cyborg.ai (security/governance), AuditBeacon "
+        "(immutable operational memory), and the RecursiveLearningAgent "
+        "(recursive executive operator / self-learning loop)."
     ),
     version="2.0.0",
     lifespan=lifespan,
@@ -111,6 +113,7 @@ app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["Mission 
 app.include_router(trust_router, prefix="/api/trust", tags=["Proof of Trust"])
 app.include_router(ops_brief_router, prefix="/api/ops-brief", tags=["Stephanie Ops Brief"])
 app.include_router(governance_router, prefix="/api/governance", tags=["Stephanie Governance"])
+app.include_router(learning_router, prefix="/api/learning", tags=["Recursive Learning"])
 
 
 if __name__ == "__main__":

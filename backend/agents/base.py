@@ -32,6 +32,7 @@ class AgentFamily(StrEnum):
     PERMIT_STREAM = "PermitStream"
     CYBORG = "Cyborg"
     AUDIT_BEACON = "AuditBeacon"
+    RECURSIVE_LEARNING = "RecursiveLearning"
 
 
 class AgentStatus(StrEnum):

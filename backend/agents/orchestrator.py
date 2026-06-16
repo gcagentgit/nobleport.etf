@@ -19,6 +19,7 @@ from backend.agents.gcagent import GCAgent
 from backend.agents.permit_stream import PermitStreamAgent
 from backend.agents.cyborg import CyborgAgent
 from backend.agents.audit_beacon import AuditBeaconAgent
+from backend.agents.recursive_learning import RecursiveLearningAgent
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,17 @@ EVENT_ROUTING: dict[str, AgentFamily] = {
     "get_audit_trail": AgentFamily.AUDIT_BEACON,
     "verify_chain_integrity": AgentFamily.AUDIT_BEACON,
     "get_proof_of_trust": AgentFamily.AUDIT_BEACON,
+
+    # RecursiveLearning: self-learning / executive reasoning
+    "run_learning_cycle": AgentFamily.RECURSIVE_LEARNING,
+    "recursive_learn": AgentFamily.RECURSIVE_LEARNING,
+    "run_priority_topic": AgentFamily.RECURSIVE_LEARNING,
+    "run_first_pilot": AgentFamily.RECURSIVE_LEARNING,
+    "get_command_center": AgentFamily.RECURSIVE_LEARNING,
+    "get_memory": AgentFamily.RECURSIVE_LEARNING,
+    "list_loops": AgentFamily.RECURSIVE_LEARNING,
+    "list_knowledge_domains": AgentFamily.RECURSIVE_LEARNING,
+    "list_priority_topics": AgentFamily.RECURSIVE_LEARNING,
 }
 
 
@@ -104,6 +116,7 @@ class AgentMesh:
         self.permit_stream = PermitStreamAgent()
         self.cyborg = CyborgAgent()
         self.audit_beacon = AuditBeaconAgent()
+        self.recursive_learning = RecursiveLearningAgent()
 
         self._agents: dict[AgentFamily, BaseAgent] = {
             AgentFamily.STEPHANIE: self.stephanie,
@@ -111,6 +124,7 @@ class AgentMesh:
             AgentFamily.PERMIT_STREAM: self.permit_stream,
             AgentFamily.CYBORG: self.cyborg,
             AgentFamily.AUDIT_BEACON: self.audit_beacon,
+            AgentFamily.RECURSIVE_LEARNING: self.recursive_learning,
         }
 
     # -----------------------------------------------------------------------
