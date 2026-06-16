@@ -35,6 +35,7 @@ from backend.api.trust import router as trust_router
 from backend.api.ops_brief import router as ops_brief_router
 from backend.api.governance import router as governance_router
 from backend.api.learning import router as learning_router
+from backend.api.np_os import router as np_os_router
 from backend.config.database import init_db
 from backend.config.settings import settings
 from backend.services.sync_engine import SyncEngine
@@ -114,6 +115,7 @@ app.include_router(trust_router, prefix="/api/trust", tags=["Proof of Trust"])
 app.include_router(ops_brief_router, prefix="/api/ops-brief", tags=["Stephanie Ops Brief"])
 app.include_router(governance_router, prefix="/api/governance", tags=["Stephanie Governance"])
 app.include_router(learning_router, prefix="/api/learning", tags=["Recursive Learning"])
+app.include_router(np_os_router, prefix="/api/np-os", tags=["NP-OS Master Operating System"])
 
 
 if __name__ == "__main__":

@@ -9,6 +9,23 @@
 // ─── Enums ────────────────────────────────────────────────────────────
 export { RevenueLoopStage } from './types';
 
+// ─── Master Operating System manifest ─────────────────────────────────
+// The canonical NP-OS definition (mirror of backend/core/np_os.py).
+export {
+  NP_OS_SYSTEM_MAP,
+  NP_OS_LAYERS,
+  NP_OS_MASTER_TABLES,
+  NP_OS_NORTH_STAR_METRICS,
+} from './manifest';
+export type {
+  LayerId,
+  LayerAuthority,
+  NpOsLayer,
+  MasterTable,
+  NorthStarMetric,
+  NpOsSystemMap,
+} from './manifest';
+
 // ─── Type-only re-exports ─────────────────────────────────────────────
 export type {
   // Revenue Loop
