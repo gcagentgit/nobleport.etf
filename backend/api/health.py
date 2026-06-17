@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from backend.config.command_freeze import BLOCKED_COMMANDS
 from backend.config.operational_truth import OPERATIONAL_TRUTH, get_status_summary
 from backend.config.settings import settings
+from backend.core.secrets import get_secrets_manager
 
 router = APIRouter()
 
@@ -47,6 +48,16 @@ async def feature_status():
             for k, v in OPERATIONAL_TRUTH.items()
         },
     }
+
+
+@router.get("/health/secrets")
+async def secrets_health():
+    """Secrets management posture per the Secrets Management Policy v1.0.
+
+    Reports the active provider, encrypted-cache stats, rotation-callback
+    registrations, and rotation status — without ever exposing secret values.
+    """
+    return get_secrets_manager().health()
 
 
 @router.get("/health/command-freeze")
