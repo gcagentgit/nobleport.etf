@@ -77,30 +77,32 @@ The registry enforces the advisory invariant: any layer flagged
 
 ## Master database
 
-The single source of truth is built on 19 core tables. Tables backed by a
-SQLAlchemy model today are marked *modeled*; the rest are *planned*.
+The single source of truth is built on 19 core tables. Every table is backed
+by a SQLAlchemy model (`backend/models/`); the registry test suite asserts
+each one is importable, so the catalog can never reference a model that does
+not exist.
 
-| Table | Status |
+| Table | Model |
 | --- | --- |
-| Clients | planned |
-| Properties | planned |
-| Leads | modeled (`models/lead.py`) |
-| Estimates | modeled (`models/estimate.py`) |
-| Contracts | planned |
-| Projects | modeled (`models/project.py`) |
-| Tasks | modeled (`models/schedule.py`) |
-| Permits | modeled (`models/permit.py`) |
-| Inspections | modeled (`models/inspection.py`) |
-| Invoices | modeled (`models/invoice.py`) |
-| Payments | modeled (`models/payment.py`) |
-| Change Orders | modeled (`models/change_order.py`) |
-| Vendors | planned |
-| Subcontractors | planned |
-| Employees | planned |
-| Equipment | planned |
-| Photos | modeled (`models/media.py`) |
-| Documents | planned |
-| Audit Logs | modeled (`models/trust_record.py`) |
+| Clients | `models/client.py` |
+| Properties | `models/property.py` |
+| Leads | `models/lead.py` |
+| Estimates | `models/estimate.py` |
+| Contracts | `models/contract.py` |
+| Projects | `models/project.py` |
+| Tasks | `models/schedule.py` |
+| Permits | `models/permit.py` |
+| Inspections | `models/inspection.py` |
+| Invoices | `models/invoice.py` |
+| Payments | `models/payment.py` |
+| Change Orders | `models/change_order.py` |
+| Vendors | `models/vendor.py` |
+| Subcontractors | `models/subcontractor.py` |
+| Employees | `models/employee.py` |
+| Equipment | `models/equipment.py` |
+| Photos | `models/media.py` |
+| Documents | `models/document.py` |
+| Audit Logs | `models/trust_record.py` |
 
 ---
 

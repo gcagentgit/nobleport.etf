@@ -265,11 +265,11 @@ export const NP_OS_LAYERS: NpOsLayer[] = [
 ];
 
 export const NP_OS_MASTER_TABLES: MasterTable[] = [
-  { name: 'Clients', description: 'People and organizations NoblePort does business with.', model: null },
-  { name: 'Properties', description: 'Physical addresses and their system records.', model: null },
+  { name: 'Clients', description: 'People and organizations NoblePort does business with.', model: 'backend.models.client.Client' },
+  { name: 'Properties', description: 'Physical addresses and their system records.', model: 'backend.models.property.Property' },
   { name: 'Leads', description: 'Inbound demand and pipeline position.', model: 'backend.models.lead.Lead' },
   { name: 'Estimates', description: 'Priced scopes and proposals.', model: 'backend.models.estimate.Estimate' },
-  { name: 'Contracts', description: 'Executed agreements binding scope, price, and terms.', model: null },
+  { name: 'Contracts', description: 'Executed agreements binding scope, price, and terms.', model: 'backend.models.contract.Contract' },
   { name: 'Projects', description: 'Construction projects under management.', model: 'backend.models.project.Project' },
   { name: 'Tasks', description: 'Schedule items and field work.', model: 'backend.models.schedule.ScheduleItem' },
   { name: 'Permits', description: 'Permit applications and their status.', model: 'backend.models.permit.Permit' },
@@ -277,12 +277,12 @@ export const NP_OS_MASTER_TABLES: MasterTable[] = [
   { name: 'Invoices', description: 'Billed amounts and line items.', model: 'backend.models.invoice.Invoice' },
   { name: 'Payments', description: 'Inbound and outbound money movement.', model: 'backend.models.payment.Payment' },
   { name: 'Change Orders', description: 'Approved/pending scope changes.', model: 'backend.models.change_order.ChangeOrder' },
-  { name: 'Vendors', description: 'Material and service suppliers.', model: null },
-  { name: 'Subcontractors', description: 'Trade partners performing work.', model: null },
-  { name: 'Employees', description: 'Internal staff and field crews.', model: null },
-  { name: 'Equipment', description: 'Owned and rented equipment.', model: null },
+  { name: 'Vendors', description: 'Material and service suppliers.', model: 'backend.models.vendor.Vendor' },
+  { name: 'Subcontractors', description: 'Trade partners performing work.', model: 'backend.models.subcontractor.Subcontractor' },
+  { name: 'Employees', description: 'Internal staff and field crews.', model: 'backend.models.employee.Employee' },
+  { name: 'Equipment', description: 'Owned and rented equipment.', model: 'backend.models.equipment.Equipment' },
   { name: 'Photos', description: 'Field photo documentation.', model: 'backend.models.media.MediaFile' },
-  { name: 'Documents', description: 'Contracts, plans, and attachments.', model: null },
+  { name: 'Documents', description: 'Contracts, plans, and attachments.', model: 'backend.models.document.Document' },
   { name: 'Audit Logs', description: 'Immutable hash-linked record of every action.', model: 'backend.models.trust_record.TrustRecord' },
 ];
 

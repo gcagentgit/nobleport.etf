@@ -484,11 +484,11 @@ LAYERS: tuple[Layer, ...] = (
 
 
 MASTER_TABLES: tuple[MasterTable, ...] = (
-    MasterTable("Clients", "People and organizations NoblePort does business with."),
-    MasterTable("Properties", "Physical addresses and their system records."),
+    MasterTable("Clients", "People and organizations NoblePort does business with.", "backend.models.client.Client"),
+    MasterTable("Properties", "Physical addresses and their system records.", "backend.models.property.Property"),
     MasterTable("Leads", "Inbound demand and pipeline position.", "backend.models.lead.Lead"),
     MasterTable("Estimates", "Priced scopes and proposals.", "backend.models.estimate.Estimate"),
-    MasterTable("Contracts", "Executed agreements binding scope, price, and terms."),
+    MasterTable("Contracts", "Executed agreements binding scope, price, and terms.", "backend.models.contract.Contract"),
     MasterTable("Projects", "Construction projects under management.", "backend.models.project.Project"),
     MasterTable("Tasks", "Schedule items and field work.", "backend.models.schedule.ScheduleItem"),
     MasterTable("Permits", "Permit applications and their status.", "backend.models.permit.Permit"),
@@ -496,12 +496,12 @@ MASTER_TABLES: tuple[MasterTable, ...] = (
     MasterTable("Invoices", "Billed amounts and line items.", "backend.models.invoice.Invoice"),
     MasterTable("Payments", "Inbound and outbound money movement.", "backend.models.payment.Payment"),
     MasterTable("Change Orders", "Approved/pending scope changes.", "backend.models.change_order.ChangeOrder"),
-    MasterTable("Vendors", "Material and service suppliers."),
-    MasterTable("Subcontractors", "Trade partners performing work."),
-    MasterTable("Employees", "Internal staff and field crews."),
-    MasterTable("Equipment", "Owned and rented equipment."),
+    MasterTable("Vendors", "Material and service suppliers.", "backend.models.vendor.Vendor"),
+    MasterTable("Subcontractors", "Trade partners performing work.", "backend.models.subcontractor.Subcontractor"),
+    MasterTable("Employees", "Internal staff and field crews.", "backend.models.employee.Employee"),
+    MasterTable("Equipment", "Owned and rented equipment.", "backend.models.equipment.Equipment"),
     MasterTable("Photos", "Field photo documentation.", "backend.models.media.MediaFile"),
-    MasterTable("Documents", "Contracts, plans, and attachments."),
+    MasterTable("Documents", "Contracts, plans, and attachments.", "backend.models.document.Document"),
     MasterTable("Audit Logs", "Immutable hash-linked record of every action.", "backend.models.trust_record.TrustRecord"),
 )
 

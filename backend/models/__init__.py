@@ -6,6 +6,14 @@ Import all models here so Base.metadata.create_all() picks them up.
 """
 
 from backend.models.lead import Lead  # noqa: F401
+from backend.models.client import Client  # noqa: F401
+from backend.models.property import Property  # noqa: F401
+from backend.models.contract import Contract  # noqa: F401
+from backend.models.vendor import Vendor  # noqa: F401
+from backend.models.subcontractor import Subcontractor  # noqa: F401
+from backend.models.employee import Employee  # noqa: F401
+from backend.models.equipment import Equipment  # noqa: F401
+from backend.models.document import Document  # noqa: F401
 from backend.models.project import Project  # noqa: F401
 from backend.models.estimate import Estimate  # noqa: F401
 from backend.models.job import Job  # noqa: F401

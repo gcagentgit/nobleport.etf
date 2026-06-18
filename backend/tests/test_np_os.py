@@ -51,6 +51,22 @@ def test_master_catalog_matches_spec():
     assert len(MASTER_TABLES) == 19
 
 
+def test_every_master_table_is_modeled():
+    # All 19 core tables now have a backing SQLAlchemy model.
+    unmodeled = [t.name for t in NP_OS.tables if t.model is None]
+    assert unmodeled == [], f"tables still planned (no model): {unmodeled}"
+
+
+def test_master_table_models_are_importable():
+    import importlib
+
+    for table in NP_OS.tables:
+        assert table.model is not None
+        module_path, _, attr = table.model.rpartition(".")
+        module = importlib.import_module(module_path)
+        assert hasattr(module, attr), f"{table.model} not found"
+
+
 def test_stephanie_is_advisory_only():
     executive = NP_OS.layer(LayerId.EXECUTIVE)
     auth = executive.authority
