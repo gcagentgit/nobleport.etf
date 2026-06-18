@@ -33,6 +33,7 @@ class AgentFamily(StrEnum):
     CYBORG = "Cyborg"
     AUDIT_BEACON = "AuditBeacon"
     RECURSIVE_LEARNING = "RecursiveLearning"
+    JOURNEY = "Journey"
 
 
 class AgentStatus(StrEnum):
