@@ -12,6 +12,7 @@ Agent families:
   - Cyborg.ai       : Security, governance, risk verification
   - AuditBeacon     : Immutable operational memory (hash-chain ledger)
   - RecursiveLearningAgent : Recursive executive operator (self-learning loop)
+  - JourneyAgent    : Story Engine — operational artifacts → content assets
 
 The Orchestrator (AgentMesh) wires them together and provides
 a unified routing and health surface for Mission Control.
@@ -24,6 +25,7 @@ from backend.agents.permit_stream import PermitStreamAgent
 from backend.agents.cyborg import CyborgAgent
 from backend.agents.audit_beacon import AuditBeaconAgent
 from backend.agents.recursive_learning import RecursiveLearningAgent
+from backend.agents.journey import JourneyAgent
 from backend.agents.orchestrator import AgentMesh
 
 __all__ = [
@@ -36,5 +38,6 @@ __all__ = [
     "CyborgAgent",
     "AuditBeaconAgent",
     "RecursiveLearningAgent",
+    "JourneyAgent",
     "AgentMesh",
 ]

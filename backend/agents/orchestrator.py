@@ -20,6 +20,7 @@ from backend.agents.permit_stream import PermitStreamAgent
 from backend.agents.cyborg import CyborgAgent
 from backend.agents.audit_beacon import AuditBeaconAgent
 from backend.agents.recursive_learning import RecursiveLearningAgent
+from backend.agents.journey import JourneyAgent
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,16 @@ EVENT_ROUTING: dict[str, AgentFamily] = {
     "list_loops": AgentFamily.RECURSIVE_LEARNING,
     "list_knowledge_domains": AgentFamily.RECURSIVE_LEARNING,
     "list_priority_topics": AgentFamily.RECURSIVE_LEARNING,
+
+    # Journey: Story Engine — operational artifacts -> content assets
+    "process_artifact": AgentFamily.JOURNEY,
+    "capture_artifact": AgentFamily.JOURNEY,
+    "approve_asset": AgentFamily.JOURNEY,
+    "get_story_engine": AgentFamily.JOURNEY,
+    "get_assets": AgentFamily.JOURNEY,
+    "get_flywheel": AgentFamily.JOURNEY,
+    "list_channels": AgentFamily.JOURNEY,
+    "list_playbooks": AgentFamily.JOURNEY,
 }
 
 
@@ -117,6 +128,7 @@ class AgentMesh:
         self.cyborg = CyborgAgent()
         self.audit_beacon = AuditBeaconAgent()
         self.recursive_learning = RecursiveLearningAgent()
+        self.journey = JourneyAgent()
 
         self._agents: dict[AgentFamily, BaseAgent] = {
             AgentFamily.STEPHANIE: self.stephanie,
@@ -125,6 +137,7 @@ class AgentMesh:
             AgentFamily.CYBORG: self.cyborg,
             AgentFamily.AUDIT_BEACON: self.audit_beacon,
             AgentFamily.RECURSIVE_LEARNING: self.recursive_learning,
+            AgentFamily.JOURNEY: self.journey,
         }
 
     # -----------------------------------------------------------------------
