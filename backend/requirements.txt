@@ -23,6 +23,11 @@ aiohttp==3.11.11
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.20
+# cryptography (used by the Secrets Manager AES-GCM cache) is pulled in via
+# python-jose[cryptography], but its cffi C-extension backend must be declared
+# explicitly — otherwise a fresh environment can load a cryptography build
+# whose _cffi_backend is missing and panic at import (PanicException).
+cffi==2.0.0
 
 # Task Scheduling & Background Jobs
 celery==5.4.0
