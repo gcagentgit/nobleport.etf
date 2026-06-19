@@ -8,6 +8,12 @@ Import all models here so Base.metadata.create_all() picks them up.
 from backend.models.lead import Lead  # noqa: F401
 from backend.models.project import Project  # noqa: F401
 from backend.models.estimate import Estimate  # noqa: F401
+from backend.models.proposal import (  # noqa: F401
+    Proposal,
+    ProposalLineItem,
+    ProposalMilestone,
+    ProposalScopeItem,
+)
 from backend.models.job import Job  # noqa: F401
 from backend.models.payment import Payment  # noqa: F401
 from backend.models.change_order import ChangeOrder  # noqa: F401
