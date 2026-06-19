@@ -513,6 +513,129 @@ class EstimateResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --- Proposal Schemas ---
+
+class ProposalCreate(BaseModel):
+    estimate_id: str
+    title: Optional[str] = None
+    markup_percent: Optional[float] = None
+    deposit_percent: Optional[float] = None
+    valid_until: Optional[datetime] = None
+    terms: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ProposalLineItemCreate(BaseModel):
+    description: str = Field(..., max_length=500)
+    quantity: float = 1.0
+    labor_cost: float = 0.0
+    material_cost: float = 0.0
+    unit: Optional[str] = None
+    category: Optional[str] = None
+    cost_code: Optional[str] = None
+    is_allowance: bool = False
+
+
+class ProposalScopeItemCreate(BaseModel):
+    kind: str = Field(..., description="inclusion | exclusion | assumption")
+    text: str
+
+
+class ProposalMilestoneCreate(BaseModel):
+    name: str
+    trigger: Optional[str] = None
+    milestone_type: str = "progress"
+    percent: float
+
+
+class ProposalScheduleCreate(BaseModel):
+    milestones: list[ProposalMilestoneCreate]
+
+
+class ProposalAccept(BaseModel):
+    signer_name: str
+    signer_email: Optional[str] = None
+    signer_ip: Optional[str] = None
+    signature_text: Optional[str] = None
+
+
+class ProposalLineItemResponse(BaseModel):
+    id: str
+    description: str
+    quantity: float
+    unit: Optional[str]
+    labor_cost: float
+    material_cost: float
+    total: float
+    category: Optional[str]
+    cost_code: Optional[str]
+    is_allowance: bool
+    sort_order: int
+
+    model_config = {"from_attributes": True}
+
+
+class ProposalScopeItemResponse(BaseModel):
+    id: str
+    kind: str
+    text: str
+    sort_order: int
+
+    model_config = {"from_attributes": True}
+
+
+class ProposalMilestoneResponse(BaseModel):
+    id: str
+    name: str
+    trigger: Optional[str]
+    milestone_type: str
+    percent: float
+    amount: float
+    sort_order: int
+
+    model_config = {"from_attributes": True}
+
+
+class ProposalResponse(BaseModel):
+    id: str
+    estimate_id: str
+    lead_id: Optional[str]
+    proposal_number: str
+    title: str
+    version: int
+    client_name: str
+    client_email: Optional[str]
+    client_phone: Optional[str]
+    project_address: Optional[str]
+    status: str
+    labor_total: float
+    material_total: float
+    allowance_total: float
+    subtotal: float
+    markup_percent: float
+    markup_amount: float
+    total: float
+    deposit_percent: float
+    deposit_amount: float
+    terms: Optional[str]
+    notes: Optional[str]
+    valid_until: Optional[datetime]
+    sent_at: Optional[datetime]
+    viewed_at: Optional[datetime]
+    accepted_at: Optional[datetime]
+    signer_name: Optional[str]
+    signed_at: Optional[datetime]
+    is_contract_ready: bool = False
+    readiness_blockers: list[str] = Field(default_factory=list)
+    line_items: list[ProposalLineItemResponse] = Field(default_factory=list)
+    scope_items: list[ProposalScopeItemResponse] = Field(default_factory=list)
+    milestones: list[ProposalMilestoneResponse] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # --- Job Schemas ---
 
 class JobUpdate(BaseModel):

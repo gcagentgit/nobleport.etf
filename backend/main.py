@@ -26,6 +26,7 @@ from backend.api.buildertrend import router as buildertrend_router
 from backend.api.sync import router as sync_router
 from backend.api.bridge import router as bridge_router
 from backend.api.estimates import router as estimates_router
+from backend.api.proposals import router as proposals_router
 from backend.api.jobs import router as jobs_router
 from backend.api.payments import router as payments_router
 from backend.api.change_orders import router as change_orders_router
@@ -130,6 +131,7 @@ app.include_router(buildertrend_router, prefix="/api/buildertrend", tags=["Build
 app.include_router(sync_router, prefix="/api/sync", tags=["Sync"])
 app.include_router(bridge_router, prefix="/api/bridge", tags=["NoblePort Bridge"])
 app.include_router(estimates_router, prefix="/api/estimates", tags=["Estimates"])
+app.include_router(proposals_router, prefix="/api/proposals", tags=["Proposal Engine"])
 app.include_router(jobs_router, prefix="/api/jobs", tags=["Jobs"])
 app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
 app.include_router(change_orders_router, prefix="/api/change-orders", tags=["Change Orders (AWO)"])
