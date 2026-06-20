@@ -267,11 +267,20 @@ class StripeService:
             logger.warning("Stripe webhook secret not configured")
             return False
 
+        if not signature:
+            return False
+
         elements = signature.split(",")
         timestamp = None
         sig_v1 = None
 
         for element in elements:
+            # Malformed elements (no "=") must fail closed, not raise. A webhook
+            # validator that crashes on garbage input is a denial-of-service and
+            # a correctness hazard — it must return False on any unparseable
+            # signature header.
+            if "=" not in element:
+                continue
             key, value = element.split("=", 1)
             if key == "t":
                 timestamp = value
@@ -281,7 +290,10 @@ class StripeService:
         if not timestamp or not sig_v1:
             return False
 
-        signed_payload = f"{timestamp}.{payload.decode('utf-8')}"
+        try:
+            signed_payload = f"{timestamp}.{payload.decode('utf-8')}"
+        except (UnicodeDecodeError, AttributeError):
+            return False
         expected = hmac.new(
             self.webhook_secret.encode("utf-8"),
             signed_payload.encode("utf-8"),
