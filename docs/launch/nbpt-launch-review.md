@@ -30,10 +30,22 @@ Two honesty axes are used throughout, matching the project's own framework
 | Axis | Result | Source |
 |---|---|---|
 | Design maturity (avg) | **89%** | `truth_label.py` → DESIGN_MATURITY |
-| Runtime evidence (gating artifacts proven) | **0 / 8 (0%)** | `python -m backend.verification.truth_label` |
-| Platform status | **STAGED / PRE-PRODUCTION** | truth label output |
-| Deployment verified | **NO** | truth label output |
+| Runtime evidence — fresh checkout | **0 / 8 (0%)** | evidence index is gitignored; reports 0% until the suite is run |
+| Runtime evidence — after running the offline suite | **6 / 8 (75%)** | `bash backend/verification/run_verification.sh` (verified 2026-06-21) |
+| Platform status | **STAGED · PARTIAL-EVIDENCE** | truth label output after run |
+| Deployment verified | **NO** | 2 remaining artifacts are live-only (k6 load, Stripe sandbox) |
 | Production certified | **NO** | truth label output |
+
+> **Verified this pass:** I installed `backend/requirements.txt` and ran
+> `run_verification.sh`. All six offline-runnable gating checks pass —
+> `build_typecheck`, `health_endpoint`, `route_contract` (16), `migration_roundtrip`
+> (2), `payment_verification` (4), `webhook_security` (8) — plus the `object_storage`
+> honesty tripwire (NOT_APPLICABLE, green). The label moves from `BLOCKED`/0% to
+> `STAGED · PARTIAL-EVIDENCE`/75%. The only two artifacts still `PENDING` require a
+> live deployment + real Stripe test keys (`k6` tiered load report, Stripe sandbox
+> payment/webhook capture) and cannot be produced offline. Note: evidence artifacts
+> are deliberately gitignored (`the checks are the source of truth, not these
+> snapshots`), so this 75% is reproduced by re-running the suite, not committed.
 
 **The platform is architecturally strong and STAGED — and the codebase is, almost
 everywhere, rigorously honest about that.** The Operational Truth Matrix
@@ -192,11 +204,12 @@ at the most visible point in the repo.
 1. **README securities/production overclaims** (§6). Truthfulness defect.
 
 **P1 — needed for a credible "staged, testable" launch**
-2. **Runtime evidence = 0%.** Collect the offline-runnable gating artifacts
-   (typecheck, migration round-trip, route contract, health endpoint, payment
-   verification, webhook security) via `backend/verification/run_verification.sh`.
-   Six of eight gating artifacts are `runnable_offline=True` — they can be green
-   without a live deployment. Do this; it moves the label off 0%.
+2. **Runtime evidence — DONE for the offline tier (✅ 6/8, verified this pass).**
+   `run_verification.sh` was run and all six offline-runnable gating artifacts pass,
+   moving the label to `STAGED · PARTIAL-EVIDENCE`/75%. Remaining: the two live-only
+   artifacts (`k6` tiered load report, Stripe sandbox payment/webhook) must be
+   collected against a deployed environment with real Stripe test keys to reach
+   RC1. Until then the platform is correctly STAGED, not production-certified.
 3. **Dashboard mock-data labeling.** Mark the executive dashboard as
    illustrative until wired to live data, or gate demo numbers behind a "sample"
    flag.
