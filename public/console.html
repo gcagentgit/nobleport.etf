@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NoblePort — AI-Powered Roofer Console</title>
+<style>
+  :root{
+    --ink:#1c2630;--ink-2:#11181f;--ink-3:#243341;
+    --copper:#c77b3d;--copper-soft:#e0a878;
+    --parchment:#f4efe7;--card:#ffffff;--line:#e4ddd1;
+    --muted:#6f7b85;--muted-2:#9aa6af;
+    --ok:#3f7d57;--ok-bg:#e7f1ea;--warn:#b07a25;--warn-bg:#f6ecd9;
+    --plan:#5b6770;--plan-bg:#eceef0;--hold:#a8413a;--hold-bg:#f5e3e1;
+    --serif:Georgia,'Times New Roman',serif;
+    --sans:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--parchment);color:var(--ink);-webkit-font-smoothing:antialiased;line-height:1.5}
+  button{font-family:inherit}
+  :focus-visible{outline:2px solid var(--copper);outline-offset:2px;border-radius:6px}
+
+  .app{display:flex;min-height:100vh}
+  .sidebar{width:248px;flex:0 0 248px;background:var(--ink-2);color:#dfe5ea;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .brand{padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .brand .mark{font-family:var(--serif);font-size:21px;letter-spacing:.3px;color:#fff;line-height:1.15}
+  .brand .mark b{color:var(--copper);font-weight:700}
+  .brand .sub{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin-top:7px}
+  .pitch{height:0;border-top:2px solid var(--copper);width:46px;margin-top:12px;transform:skewY(-9deg);transform-origin:left;opacity:.9}
+  .nav{padding:12px 10px;overflow-y:auto;flex:1}
+  .nav .group{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2);padding:14px 12px 6px}
+  .navbtn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:0;color:#c4ccd3;padding:9px 12px;border-radius:8px;font-size:13.5px;cursor:pointer;transition:background .15s,color .15s}
+  .navbtn:hover{background:rgba(255,255,255,.05);color:#fff}
+  .navbtn.active{background:var(--ink-3);color:#fff;box-shadow:inset 2px 0 0 var(--copper)}
+  .navbtn .ico{width:18px;text-align:center;font-size:14px;opacity:.9}
+  .sidefoot{padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:var(--muted-2);line-height:1.45}
+  .sidefoot b{color:#cfd6dc;font-weight:600}
+
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .topbar{background:var(--card);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .topbar h1{font-family:var(--serif);font-size:20px;margin:0;font-weight:600}
+  .topbar .crumb{font-size:11.5px;color:var(--muted);letter-spacing:.04em;margin-bottom:2px}
+  .demobadge{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--copper);border:1px solid var(--copper-soft);border-radius:999px;padding:5px 11px;white-space:nowrap}
+  .content{padding:26px;max-width:1180px;width:100%}
+
+  .lead{font-size:14px;color:var(--muted);max-width:64ch;margin:2px 0 22px}
+  .sechead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:30px 0 14px}
+  .sechead h2{font-family:var(--serif);font-size:17px;margin:0;font-weight:600}
+  .sechead .count{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-align:right}
+
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(232px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;display:flex;flex-direction:column;gap:9px;min-height:104px}
+  .card .ttl{font-size:14px;font-weight:600;line-height:1.25}
+  .card .desc{font-size:12px;color:var(--muted);flex:1}
+  .badge{align-self:flex-start;font-size:10.5px;font-weight:600;letter-spacing:.03em;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .b-ok{background:var(--ok-bg);color:var(--ok)}
+  .b-warn{background:var(--warn-bg);color:var(--warn)}
+  .b-plan{background:var(--plan-bg);color:var(--plan)}
+  .b-hold{background:var(--hold-bg);color:var(--hold)}
+  .flag{font-size:10.5px;color:var(--hold);display:flex;align-items:flex-start;gap:5px;margin-top:2px;line-height:1.35}
+
+  .stats{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:8px}
+  .stat{background:var(--ink);color:#fff;border-radius:var(--radius);padding:18px}
+  .stat .n{font-family:var(--serif);font-size:30px;line-height:1}
+  .stat .n small{font-size:14px;color:var(--copper-soft)}
+  .stat .l{font-size:12px;color:#aebac4;margin-top:8px;letter-spacing:.02em}
+  .stat.alt{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+  .stat.alt .l{color:var(--muted)}
+  .sample{font-size:10px;color:var(--muted-2);letter-spacing:.1em;text-transform:uppercase;margin-top:6px}
+
+  .matrix{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#faf7f1;font-weight:600}
+  tr:last-child td{border-bottom:0}
+  td .svc{font-weight:600}
+  td .note{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .chip{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:6px;white-space:nowrap}
+  .c-ok{background:var(--ok-bg);color:var(--ok)}
+  .c-warn{background:var(--warn-bg);color:var(--warn)}
+  .c-plan{background:var(--plan-bg);color:var(--plan)}
+  .c-hold{background:var(--hold-bg);color:var(--hold)}
+
+  .road{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(248px,1fr))}
+  .road .card .ttl{font-family:var(--serif);font-size:15px}
+  .sepnote{background:#faf7f1;border:1px dashed var(--copper-soft);border-radius:var(--radius);padding:13px 16px;font-size:12.5px;color:var(--ink);margin-bottom:16px;line-height:1.5}
+  .sepnote b{color:var(--copper)}
+
+  .asst{display:flex;flex-direction:column;height:min(620px,72vh);background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .asst .log{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+  .msg{max-width:80%;padding:11px 14px;border-radius:12px;font-size:13.5px;line-height:1.5;white-space:pre-wrap}
+  .msg.user{align-self:flex-end;background:var(--ink);color:#fff;border-bottom-right-radius:4px}
+  .msg.bot{align-self:flex-start;background:#f4f1ea;color:var(--ink);border-bottom-left-radius:4px;border:1px solid var(--line)}
+  .msg.bot.thinking{color:var(--muted);font-style:italic}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;padding:0 18px 12px}
+  .qchip{font-size:12px;background:#f4f1ea;border:1px solid var(--line);color:var(--ink);padding:6px 11px;border-radius:999px;cursor:pointer;text-align:left}
+  .qchip:hover{border-color:var(--copper);color:var(--copper)}
+  .composer{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--line);background:#fdfcfa}
+  .composer input{flex:1;border:1px solid var(--line);border-radius:8px;padding:11px 13px;font-size:13.5px;font-family:inherit;background:#fff}
+  .composer button{background:var(--copper);color:#fff;border:0;border-radius:8px;padding:0 18px;font-size:13.5px;font-weight:600;cursor:pointer}
+  .composer button:disabled{opacity:.5;cursor:default}
+  .asst .note{font-size:11px;color:var(--muted);padding:10px 16px 0}
+
+  .mobhead{display:none}
+  @media (max-width:860px){
+    .app{flex-direction:column}
+    .sidebar{display:none}
+    .mobhead{display:flex}
+    .topbar{padding:12px 16px}
+    .content{padding:16px}
+    .mobtabs{display:flex;gap:6px;overflow-x:auto;background:var(--ink-2);padding:9px 12px;position:sticky;top:0;z-index:5;-webkit-overflow-scrolling:touch}
+    .mobtab{flex:0 0 auto;background:transparent;border:0;color:#c4ccd3;font-size:12.5px;padding:7px 12px;border-radius:7px;cursor:pointer;white-space:nowrap}
+    .mobtab.active{background:var(--ink-3);color:#fff;box-shadow:inset 0 -2px 0 var(--copper)}
+    .mobbrand{background:var(--ink-2);color:#fff;padding:14px 16px 0;font-family:var(--serif);font-size:18px}
+    .mobbrand b{color:var(--copper)}
+    .msg{max-width:90%}
+    .sechead .count{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">Noble<b>Port</b></div>
+      <div class="sub">Roofing &amp; Restoration</div>
+      <div class="pitch"></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidefoot">
+      <b>NoblePort Roofing &amp; Restoration</b><br>
+      236 High Road, Newbury, MA 01951<br>
+      MA CSL #091858 · HIC #140326<br>
+      mike@nobleport.net
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="mobbrand mobhead">Noble<b>Port</b> Console</div>
+    <div class="mobtabs mobhead" id="mobtabs"></div>
+    <div class="topbar">
+      <div>
+        <div class="crumb" id="crumb">Console</div>
+        <h1 id="viewtitle">Executive Overview</h1>
+      </div>
+      <div class="demobadge">Demo build · conservative claims</div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<script>
+/* NoblePort AI-Powered Roofer Console — demo build.
+   Status labels are honest:
+   demo  = a working pipeline/prototype exists
+   integ = needs a 3rd-party feed/account to go live
+   plan  = specified, not yet built                          */
+
+const STATUS={
+  demo:{label:'Demo',cls:'b-ok'},
+  integ:{label:'Needs integration',cls:'b-warn'},
+  plan:{label:'Planned',cls:'b-plan'}
+};
+
+/* ---- Canonical skill set: exactly the 38 enumerated in the spec ---- */
+const CATS={
+  leadgen:{name:'Lead generation & customer engagement', skills:[
+    {t:'Storm lead capture', d:'Capture inbound after a storm and route by territory.', s:'integ'},
+    {t:'Missed-call text-back', d:'Auto-text callers you miss, with a booking link.', s:'integ'},
+    {t:'AI receptionist', d:'Answer and qualify inbound calls after hours.', s:'integ'},
+    {t:'Automated booking', d:'Let homeowners self-schedule an inspection.', s:'plan'},
+    {t:'Lead qualification', d:'Score new leads on intent and fit.', s:'plan'},
+    {t:'Multilingual support', d:'Serve homeowners in their preferred language.', s:'plan'},
+    {t:'SMS automation', d:'Two-way texting across the lead lifecycle.', s:'integ'},
+    {t:'Follow-up automation', d:'Trigger follow-ups on quote and inspection events.', s:'plan'}
+  ]},
+  estimate:{name:'Estimating & measurements', skills:[
+    {t:'Roof measurements', d:'Pull pitch, area and facets from a Roofr aerial report.', s:'demo'},
+    {t:'Material takeoffs', d:'Convert measurements into a material list with waste factor.', s:'demo'},
+    {t:'AI estimates', d:'Draft a priced estimate from takeoff + current pricing.', s:'demo'},
+    {t:'Property assessment', d:'Summarize property attributes that affect scope.', s:'plan'},
+    {t:'Market pricing', d:'Reference regional unit-pricing bands.', s:'plan'},
+    {t:'Supplier tracking', d:'Track supplier quotes and lead times per job.', s:'plan'},
+    {t:'Cost estimating', d:'Roll labor, materials and margin into a job cost.', s:'demo'}
+  ]},
+  sales:{name:'Sales & client communication', skills:[
+    {t:'AI proposals', d:'Generate a branded proposal from job data.', s:'demo'},
+    {t:'Virtual inspections', d:'Walk a homeowner through a guided photo inspection.', s:'integ'},
+    {t:'Appointment reminders', d:'Send timed reminders before an inspection or install.', s:'plan'},
+    {t:'Damage identification', d:'Triage homeowner photos into a first-pass damage read.', s:'integ'},
+    {t:'Lead nurturing', d:'Sequence touchpoints for leads not yet closed.', s:'plan'},
+    {t:'Documentation generation', d:'Assemble contract + scope sheet from the render pipeline.', s:'demo'}
+  ]},
+  ops:{name:'Operations', skills:[
+    {t:'Job scheduling', d:'Board view of crews against the install pipeline.', s:'plan'},
+    {t:'Route optimization', d:"Sequence the day’s site visits by drive time.", s:'integ'},
+    {t:'QR check-ins', d:'Crew check-in at the job site via QR code.', s:'plan'},
+    {t:'CRM sync', d:'Mirror leads and jobs into your CRM of record.', s:'integ'},
+    {t:'Calendar sync', d:'Push inspections and installs to Google Calendar.', s:'integ'},
+    {t:'Inventory tracking', d:'Track material on hand and on order.', s:'plan'},
+    {t:'Back-office automation', d:'Automate recurring admin and handoffs.', s:'plan'}
+  ]},
+  marketing:{name:'Marketing', skills:[
+    {t:'Geo-targeted advertising', d:'Build audience segments by service area.', s:'integ'},
+    {t:'SEO / GEO readiness', d:'Check local search and AI-answer readiness.', s:'plan'},
+    {t:'Social media generation', d:'Draft posts from completed-job photos.', s:'plan'},
+    {t:'Review automation', d:'Request and route customer reviews after completion.', s:'integ'},
+    {t:'Demand forecasting', d:'Project lead volume from seasonality and weather.', s:'plan'},
+    {t:'Competitive pricing', d:'Benchmark offers against the local market.', s:'plan'}
+  ]},
+  finance:{name:'Finance & claims', skills:[
+    {t:'Invoice automation', d:'Generate invoices from approved jobs.', s:'demo'},
+    {t:'Insurance claim assistance', d:'Help a homeowner organize claim documentation.', s:'integ', flag:'Compliance review — MA regulates public adjusting; keep scoped to documentation support.'},
+    {t:'Payment tracking', d:'Track invoice status and aging.', s:'integ'},
+    {t:'Claim package generation', d:"Assemble a photo + scope packet for the homeowner’s claim.", s:'integ', flag:'Compliance review — confirm this stays documentation, not claim adjusting.'}
+  ]}
+};
+
+const HUBS=[
+  {id:'overview', name:'Executive Overview', icon:'▦', group:'Console'},
+  {id:'storm',    name:'Storm Response Center', icon:'⛈', group:'Operating hubs'},
+  {id:'estimate', name:'AI Estimating Studio',  icon:'▤', group:'Operating hubs'},
+  {id:'sales',    name:'Sales Automation Hub',  icon:'◷', group:'Operating hubs'},
+  {id:'ops',      name:'Operations Board',      icon:'▣', group:'Operating hubs'},
+  {id:'marketing',name:'Marketing Growth Hub',  icon:'◎', group:'Operating hubs'},
+  {id:'finance',  name:'Finance & Claims Center',icon:'$', group:'Operating hubs'},
+  {id:'matrix',   name:'Integrations & Readiness', icon:'▥', group:'System'},
+  {id:'assistant',name:'AI Assistant',          icon:'✦', group:'System'},
+  {id:'roadmap',  name:'Roadmap (NoblePort Systems)', icon:'→', group:'System'}
+];
+
+const HUB_INTRO={
+  storm:'Catch storm-driven demand and turn raw inbound into qualified, territory-routed leads. Pulls from your lead-gen skills.',
+  estimate:'Turn a Roofr aerial report into measurements, takeoffs and a priced estimate.',
+  sales:'Move a qualified lead to a signed contract with branded documents and timely touchpoints.',
+  ops:'Run the work — scheduling, routing, check-ins and the systems they sync to.',
+  marketing:'Generate and measure demand across your North Shore service area.',
+  finance:'Invoicing, payment tracking and homeowner claim documentation.'
+};
+
+const HUB_PICK={
+  storm:['Storm lead capture','Missed-call text-back','AI receptionist','SMS automation','Damage identification'],
+  estimate:CATS.estimate.skills.map(s=>s.t),
+  sales:CATS.sales.skills.map(s=>s.t).concat(['Automated booking','Lead qualification','Follow-up automation']),
+  ops:CATS.ops.skills.map(s=>s.t),
+  marketing:CATS.marketing.skills.map(s=>s.t),
+  finance:CATS.finance.skills.map(s=>s.t)
+};
+
+const ALL=Object.values(CATS).flatMap(c=>c.skills);
+function findSkill(name){return ALL.find(s=>s.t===name);}
+
+const MATRIX=[
+  {svc:'Roofr aerial reports', use:'Source data for measurements & takeoffs', st:'c-ok', stl:'Source', note:'Used today as the measurement source.'},
+  {svc:'DocuSign e-sign', use:'Two-signer contract execution', st:'c-ok', stl:'Demo-verified', note:'Client /sn1/ + NoblePort counter-sign /sn2/.'},
+  {svc:'Quote / contract render', use:'Branded PDF pipeline', st:'c-ok', stl:'Demo-verified', note:'Token + JSON + render; MA HIC ⅓-deposit check built in.'},
+  {svc:'Gmail', use:'Send from nobleport.net', st:'c-ok', stl:'Connected', note:'Functional for outbound from the NoblePort address.'},
+  {svc:'Microsoft 365', use:'Search / calendar', st:'c-warn', stl:'Read-only', note:'No send; search and calendar only.'},
+  {svc:'Google Calendar', use:'Inspection / install scheduling', st:'c-warn', stl:'Available', note:'Connector present; sync skill not yet wired.'},
+  {svc:'Payments (Stripe / PayPal)', use:'Invoicing & collection', st:'c-warn', stl:'Not wired', note:'Connectors available; no payment skill live yet.'},
+  {svc:'NOAA weather feed', use:'Storm detection & targeting', st:'c-plan', stl:'Not connected', note:'Required for StormRadar / storm lead capture.'},
+  {svc:'Drone / satellite imagery', use:'Damage recognition', st:'c-plan', stl:'Not connected', note:'Required for RoofVision damage reads.'},
+  {svc:'CRM of record', use:'Lead & job system of record', st:'c-plan', stl:'Not connected', note:'No CRM selected/connected yet.'},
+  {svc:'USDC on Arbitrum', use:'On-chain payment rail', st:'c-hold', stl:'LEGAL HOLD', note:'Built & mainnet-verified. Do NOT enable without Cooley LLP review + dual approval.'}
+];
+
+const ROADMAP=[
+  {t:'StormRadar AI', d:'NOAA weather feed, hail/wind detection, homeowner targeting.'},
+  {t:'RoofVision', d:'Drone & satellite imagery with AI damage recognition.'},
+  {t:'RoofGPT', d:'Proposal writing, insurance-letter drafting, review responses, sales scripts.', flag:'Insurance-letter drafting needs the same MA public-adjuster review as the claims skills.'},
+  {t:'GCagent integration', d:'Estimate → contract → permit → production → invoice → payment chain.'},
+  {t:'NoblePort Roofing DAO', d:'Contractor credentialing, zkSBT certifications, performance scoring, referral rewards.', sys:true}
+];
+
+function skillCard(sk){
+  const st=STATUS[sk.s];
+  return `<div class="card">
+    <span class="badge ${st.cls}">${st.label}</span>
+    <div class="ttl">${sk.t}</div>
+    <div class="desc">${sk.d}</div>
+    ${sk.flag?`<div class="flag">⚠ <span>${sk.flag}</span></div>`:''}
+  </div>`;
+}
+function grid(list){return `<div class="grid">${list.map(skillCard).join('')}</div>`;}
+function tally(list){
+  const d=list.filter(s=>s.s==='demo').length, i=list.filter(s=>s.s==='integ').length, p=list.filter(s=>s.s==='plan').length;
+  return `${list.length} skills · ${d} demo / ${i} needs integration / ${p} planned`;
+}
+
+function viewOverview(){
+  const d=ALL.filter(s=>s.s==='demo').length, i=ALL.filter(s=>s.s==='integ').length, p=ALL.filter(s=>s.s==='plan').length;
+  return `<p class="lead">A single console for NoblePort’s roofing operations. Everything here is a demo-grade
+  prototype with conservative status labels — built to be wired to live data, not presented as already live.</p>
+  <div class="stats">
+    <div class="stat"><div class="n">${ALL.length}<small> / 50</small></div><div class="l">Skills defined</div><div class="sample">spec target 50 · 12 to define</div></div>
+    <div class="stat alt"><div class="n">${d}</div><div class="l">Demo pipelines working</div></div>
+    <div class="stat alt"><div class="n">${i}</div><div class="l">Awaiting integration</div></div>
+    <div class="stat alt"><div class="n">${p}</div><div class="l">Planned</div></div>
+  </div>
+  <div class="sepnote">Headline target is <b>50 skills</b>; the spec’s six categories enumerate <b>38</b>.
+  This console shows those 38 — the remaining 12 slots are open for you to define.</div>
+  ${Object.values(CATS).map(c=>`
+    <div class="sechead"><h2>${c.name}</h2><span class="count">${tally(c.skills)}</span></div>
+    ${grid(c.skills)}`).join('')}`;
+}
+function viewHub(id){
+  const list=HUB_PICK[id].map(findSkill).filter(Boolean);
+  return `<p class="lead">${HUB_INTRO[id]||''}</p>
+    <div class="sechead"><h2>Skills</h2><span class="count">${tally(list)}</span></div>
+    ${grid(list)}`;
+}
+function viewMatrix(){
+  const rows=MATRIX.map(m=>`<tr>
+    <td><div class="svc">${m.svc}</div><div class="note">${m.use}</div></td>
+    <td><span class="chip ${m.st}">${m.stl}</span></td>
+    <td><div class="note">${m.note}</div></td></tr>`).join('');
+  return `<p class="lead">An honest ledger of what each skill needs to go live. Nothing is marked
+  operational without a real connection behind it.</p>
+  <div class="matrix"><table>
+    <thead><tr><th>Service / source</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+function viewRoadmap(){
+  const cards=ROADMAP.map(r=>`<div class="card">
+    <span class="badge ${r.sys?'b-hold':'b-plan'}">${r.sys?'NoblePort Systems':'Future'}</span>
+    <div class="ttl">${r.t}</div><div class="desc">${r.d}</div>
+    ${r.flag?`<div class="flag">⚠ <span>${r.flag}</span></div>`:''}</div>`).join('');
+  return `<p class="lead">Recommended expansion after this build — targets roughly 75–100 skills total.</p>
+  <div class="sepnote">The <b>Roofing DAO / credentialing / zkSBT</b> work belongs to <b>NoblePort Systems</b>
+  (the governance entity), kept separate from NoblePort Roofing &amp; Restoration’s day-to-day operations on purpose.</div>
+  <div class="road">${cards}</div>`;
+}
+function viewAssistant(){
+  return `<p class="lead">A live assistant scoped to NoblePort’s roofing work — drafting, checklists and
+  questions about your own process. This one actually runs (it calls Claude); it doesn’t pretend to take actions it can’t.</p>
+  <div class="asst">
+    <div class="log" id="log">
+      <div class="msg bot">Hi Mike — I can help draft homeowner messages, outline inspections, or explain something like the MA HIC deposit rule. What do you need?</div>
+    </div>
+    <div class="chips" id="chips">
+      <button class="qchip">Draft a follow-up text to a storm lead who hasn’t replied</button>
+      <button class="qchip">Outline a residential roof inspection checklist</button>
+      <button class="qchip">Explain the MA HIC one-third deposit rule in plain terms</button>
+    </div>
+    <div class="composer">
+      <input id="ask" type="text" placeholder="Ask the assistant…" autocomplete="off" />
+      <button id="send">Send</button>
+    </div>
+    <div class="note">Demo assistant · drafts only, no records are changed. Verify any figures before sending to a customer.</div>
+  </div>`;
+}
+
+const RENDER={overview:viewOverview, storm:()=>viewHub('storm'), estimate:()=>viewHub('estimate'),
+  sales:()=>viewHub('sales'), ops:()=>viewHub('ops'), marketing:()=>viewHub('marketing'),
+  finance:()=>viewHub('finance'), matrix:viewMatrix, roadmap:viewRoadmap, assistant:viewAssistant};
+
+let current='overview';
+function buildNav(){
+  const nav=document.getElementById('nav');
+  let html='', last='';
+  HUBS.forEach(h=>{if(h.group!==last){html+=`<div class="group">${h.group}</div>`;last=h.group;}
+    html+=`<button class="navbtn" data-id="${h.id}"><span class="ico">${h.icon}</span>${h.name}</button>`;});
+  nav.innerHTML=html;
+  nav.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>go(b.dataset.id));
+  const mt=document.getElementById('mobtabs');
+  mt.innerHTML=HUBS.map(h=>`<button class="mobtab" data-id="${h.id}">${h.name.replace(' (NoblePort Systems)','')}</button>`).join('');
+  mt.querySelectorAll('.mobtab').forEach(b=>b.onclick=()=>go(b.dataset.id));
+}
+function go(id){
+  current=id;
+  const hub=HUBS.find(h=>h.id===id);
+  document.getElementById('viewtitle').textContent=hub.name;
+  document.getElementById('crumb').textContent=hub.group;
+  document.getElementById('content').innerHTML=RENDER[id]();
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
+  document.querySelectorAll('.mobtab').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
+  window.scrollTo({top:0});
+  if(id==='assistant') wireAssistant();
+}
+
+const SYS=`You are the NoblePort roofing operations assistant for Michael O’Rourke, owner of
+NoblePort Roofing & Restoration (Newbury, MA; North Shore service area; MA CSL #091858, HIC #140326).
+Help with roofing sales, estimating, operations and homeowner communication. Be concise and practical.
+Massachusetts Home Improvement Contractor law caps the first/deposit payment at one-third of the total
+contract value — respect this in any payment guidance. For insurance claims, stay on the side of helping
+homeowners DOCUMENT damage; do not draft anything that amounts to adjusting or negotiating a claim, and
+note that public adjusting is licensed in MA. Never invent specific prices, measurements, or legal
+guarantees; tell the user to verify those.`;
+let history=[];
+function wireAssistant(){
+  const input=document.getElementById('ask'), send=document.getElementById('send');
+  if(!input||input.dataset.wired) return;
+  input.dataset.wired='1';
+  const fire=()=>{const v=input.value.trim(); if(v) ask(v); input.value='';};
+  send.onclick=fire;
+  input.onkeydown=e=>{if(e.key==='Enter') fire();};
+  document.querySelectorAll('#chips .qchip').forEach(c=>c.onclick=()=>ask(c.textContent));
+}
+function addMsg(text,who,thinking){
+  const log=document.getElementById('log'); const d=document.createElement('div');
+  d.className='msg '+who+(thinking?' thinking':''); d.textContent=text;
+  log.appendChild(d); log.scrollTop=log.scrollHeight; return d;
+}
+async function ask(q){
+  if(current!=='assistant') return;
+  addMsg(q,'user'); history.push({role:'user',content:q});
+  const t=addMsg('Thinking…','bot',true);
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:SYS,messages:history})});
+    const data=await res.json();
+    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim()||'I couldn’t generate a reply just now.';
+    t.remove(); addMsg(text,'bot'); history.push({role:'assistant',content:text});
+  }catch(err){
+    t.remove();
+    addMsg('The assistant is offline in this view. Open the console outside the preview to use the live assistant.','bot');
+    history.pop();
+  }
+}
+
+buildNav(); go('overview');
+</script>
+</body>
+</html>
