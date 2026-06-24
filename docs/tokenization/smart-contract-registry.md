@@ -25,7 +25,7 @@ deliberately strict, mirroring the repo's existing Operational Truth Matrix
 | **SIMULATION** | Exists only as a simulation report, metric, or narrative artifact. Not deployment evidence. |
 
 > **Bottom line up front:** As of this date, **0 contracts are DEPLOYED** with
-> verifiable on-chain proof. **3 are IMPLEMENTED** in this repo. The remaining
+> verifiable on-chain proof. **4 are IMPLEMENTED** in this repo. The remaining
 > named contracts are DOCUMENTED or ROADMAP. Simulation counts (5,000-tx
 > compliance runs, validator counts, avatar governance events) are **not**
 > deployment evidence and are tracked separately.
@@ -39,6 +39,7 @@ deliberately strict, mirroring the repo's existing Operational Truth Matrix
 | `HumanApprovalGateway.sol` | IMPLEMENTED | none (testnet target) | Governance multisig (planned) | Mandatory human-in-the-loop approval for legal/medical/financial decisions | Indirect — gates all regulated flows | None (not deployed) | Low engineering risk; high importance. Needs audit before relied upon. |
 | `MassachusettsBuildingPermits.sol` | IMPLEMENTED | none (testnet target) | State/municipality roles (planned) | On-chain MA 780 CMR permit lifecycle | Indirect — supports PermitStream | None | Medium — large surface; needs audit + real municipal integration to be more than a model. |
 | `NBPTSecurityToken1400.sol` | IMPLEMENTED | none (testnet target) | Governance multisig (planned) | White-label ERC-1400 security token for NBPT, USDC-pegged subscription/redemption. Configurable per-asset (name/symbol/`tokenDetails` + `granularity`) for single-parcel land tokenization — see [land-parcel playbook](./erc1400-land-parcel-playbook.md). | **Direct if/when live** — token subscriptions/redemptions | None | **High regulatory risk.** Issuing a security. Hard-gated by `liveOfferingCleared` (Cooley gate) — no real money until counsel clears. See [erc1400-nbpt-usdc.md](./erc1400-nbpt-usdc.md). |
+| `NoblePortConstructionEscrow.sol` | IMPLEMENTED | none (Base testnet target) | Governance multisig + NoblePort approvers (planned) | Human-approved USDC milestone escrow for construction draws (permit deposit, foundation, framing, dry-in, finish, holdback). Subordinate to the approval chain — three on-chain human keys (homeowner + NoblePort + verifier) **plus** an EXECUTED FINANCIAL `HumanApprovalGateway` decision per release. EIP-3009 (`receiveWithAuthorization`) funding. **No AI authority, no autonomous release.** | **Direct (construction)** — milestone payments | None | **Low securities risk** (payment escrow, not a financing/ownership instrument). Construction-only. Needs audit before mainnet. See [usdc-construction-escrow.md](./usdc-construction-escrow.md). |
 
 ---
 
@@ -77,8 +78,8 @@ real on-chain value first.
 | Item | Status | Revenue relevance | Securities entanglement |
 |------|--------|-------------------|-------------------------|
 | TradeCred zk-SBT License Verification | ROADMAP | High (construction) | Low |
-| Progress Payment Escrow | ROADMAP | High | Low |
-| Milestone Release Escrow | ROADMAP | High | Low |
+| Progress Payment Escrow | **IMPLEMENTED** → `NoblePortConstructionEscrow.sol` | High | Low |
+| Milestone Release Escrow | **IMPLEMENTED** → `NoblePortConstructionEscrow.sol` | High | Low |
 | Contractor Bonds | ROADMAP | Medium | Low–Medium |
 | PermitStream Payment Logic | ROADMAP | High | Low |
 | Supply Chain Tracking | ROADMAP | Medium | Low |
@@ -112,7 +113,7 @@ reports, however extensive, are **not** proof of contract deployment.
 | Bucket | Count |
 |--------|-------|
 | DEPLOYED (verified on-chain) | **0** |
-| IMPLEMENTED (source in repo) | **3** |
+| IMPLEMENTED (source in repo) | **4** |
 | DOCUMENTED (named, no source) | ~12 |
 | ROADMAP (spec only) | 20+ |
 | SIMULATION/narrative artifacts | several |
