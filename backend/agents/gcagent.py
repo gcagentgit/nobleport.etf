@@ -23,7 +23,12 @@ from backend.config.database import async_session
 from backend.models.change_order import ChangeOrder, ChangeOrderStatus
 from backend.models.daily_log import DailyLog
 from backend.models.estimate import Estimate
+from backend.models.inspection import Inspection, InspectionStatus
+from backend.models.invoice import Invoice
 from backend.models.job import Job, JobStatus
+from backend.models.media import MediaFile
+from backend.models.payment import Payment, PaymentStatus
+from backend.models.permit import Permit, PermitStatus
 from backend.models.project import Project
 from backend.models.schedule import ScheduleItem, TaskStatus
 
@@ -70,6 +75,8 @@ class GCAgent(BaseAgent):
                 return await self.analyze_cost_variance(payload["job_id"])
             case "generate_daily_field_report":
                 return await self.generate_daily_field_report(payload["job_id"])
+            case "generate_closeout_package":
+                return await self.generate_closeout_package(payload["job_id"])
             # Routed events from the orchestrator
             case "job_activated" | "job_updated" | "cost_recorded" | "crew_assigned":
                 job_id = payload.get("job_id", payload.get("subject_id", ""))
@@ -760,6 +767,169 @@ class GCAgent(BaseAgent):
                 "latest_daily_log": log_data,
                 "upcoming_tasks": upcoming_tasks,
                 "financial_snapshot": financial,
+                "generated_at": now.isoformat(),
+                "agent": "GCagent",
+            }
+
+    # -----------------------------------------------------------------------
+    # 7. Closeout package (spine role #20)
+    # -----------------------------------------------------------------------
+
+    async def generate_closeout_package(self, job_id: str) -> dict[str, Any]:
+        """
+        Assemble the project closeout bundle from existing records.
+
+        Gathers the contract/financial position, change orders, permits,
+        inspections, invoices, payments, and project photos, then runs a
+        completeness check against the closeout gates (permits issued,
+        inspections passed, balance collected, deposit gate). Reads only —
+        produces no side effects, so it is safe to call at any time.
+        """
+        async with async_session() as db:
+            job = await db.get(Job, job_id)
+            if not job:
+                return {"error": f"Job {job_id} not found", "status": "unknown"}
+
+            now = datetime.now(timezone.utc)
+
+            # -- Change orders --
+            co_result = await db.execute(
+                select(ChangeOrder)
+                .where(ChangeOrder.job_id == job_id)
+                .order_by(ChangeOrder.sequence)
+            )
+            change_orders = [
+                {
+                    "change_order_number": co.change_order_number,
+                    "title": co.title,
+                    "status": co.status.value,
+                    "total_amount": co.total_amount,
+                }
+                for co in co_result.scalars()
+            ]
+
+            # -- Permits --
+            permit_result = await db.execute(
+                select(Permit).where(Permit.job_id == job_id)
+            )
+            permits = list(permit_result.scalars())
+            permit_summary = [
+                {
+                    "permit_number": p.permit_number,
+                    "ahj": p.ahj,
+                    "type": p.permit_type.value,
+                    "status": p.status.value,
+                    "issued_at": str(p.issued_at) if p.issued_at else None,
+                }
+                for p in permits
+            ]
+            unissued_permits = [
+                p.permit_number or p.permit_type.value
+                for p in permits
+                if p.status != PermitStatus.ISSUED
+            ]
+
+            # -- Inspections --
+            insp_result = await db.execute(
+                select(Inspection).where(Inspection.job_id == job_id)
+            )
+            inspections = list(insp_result.scalars())
+            inspection_summary = [
+                {
+                    "type": i.inspection_type,
+                    "status": i.status.value,
+                    "completed_at": str(i.completed_at) if i.completed_at else None,
+                    "reinspection_needed": i.reinspection_needed,
+                }
+                for i in inspections
+            ]
+            unpassed_inspections = [
+                i.inspection_type
+                for i in inspections
+                if i.status != InspectionStatus.PASSED
+            ]
+
+            # -- Invoices & payments (keyed differently: invoices by project) --
+            invoice_summary: list[dict[str, Any]] = []
+            total_balance_due = 0.0
+            if job.project_id:
+                inv_result = await db.execute(
+                    select(Invoice).where(Invoice.project_id == job.project_id)
+                )
+                for inv in inv_result.scalars():
+                    total_balance_due += inv.balance_due
+                    invoice_summary.append({
+                        "invoice_number": inv.invoice_number,
+                        "status": inv.status.value,
+                        "total": inv.total,
+                        "amount_paid": inv.amount_paid,
+                        "balance_due": inv.balance_due,
+                    })
+
+            pay_result = await db.execute(
+                select(Payment).where(
+                    Payment.job_id == job_id,
+                    Payment.status == PaymentStatus.PAID,
+                )
+            )
+            payments = list(pay_result.scalars())
+            total_payments = sum(p.amount for p in payments)
+
+            # -- Project photos (documentation) --
+            photo_count = 0
+            if job.project_id:
+                photo_count = await db.scalar(
+                    select(func.count())
+                    .select_from(MediaFile)
+                    .where(MediaFile.project_id == job.project_id)
+                ) or 0
+
+            # -- Completeness check against closeout gates --
+            missing: list[str] = []
+            if unissued_permits:
+                missing.append(
+                    f"{len(unissued_permits)} permit(s) not issued: "
+                    f"{', '.join(unissued_permits)}"
+                )
+            if unpassed_inspections:
+                missing.append(
+                    f"{len(unpassed_inspections)} inspection(s) not passed: "
+                    f"{', '.join(unpassed_inspections)}"
+                )
+            if not job.deposit_gate_passed:
+                missing.append("Deposit gate not passed")
+            if round(total_balance_due, 2) > 0:
+                missing.append(f"${total_balance_due:,.0f} balance still due")
+            if photo_count == 0:
+                missing.append("No project photos on file")
+
+            completeness = "complete" if not missing else "incomplete"
+
+            return {
+                "job_id": job_id,
+                "job_number": job.job_number,
+                "project_id": job.project_id,
+                "site_address": job.site_address,
+                "completeness": completeness,
+                "missing": missing,
+                "financials": {
+                    "contract_value": job.contract_value,
+                    "change_order_total": job.change_order_total,
+                    "adjusted_contract": job.contract_value + job.change_order_total,
+                    "total_invoiced": job.total_invoiced,
+                    "total_paid": job.total_paid,
+                    "verified_payments": round(total_payments, 2),
+                    "balance_due": round(total_balance_due, 2),
+                    "final_margin_percent": job.margin_percent,
+                },
+                "artifacts": {
+                    "change_orders": change_orders,
+                    "permits": permit_summary,
+                    "inspections": inspection_summary,
+                    "invoices": invoice_summary,
+                    "payment_count": len(payments),
+                    "photo_count": photo_count,
+                },
                 "generated_at": now.isoformat(),
                 "agent": "GCagent",
             }
