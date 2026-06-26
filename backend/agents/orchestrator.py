@@ -56,6 +56,7 @@ EVENT_ROUTING: dict[str, AgentFamily] = {
     "recommend_crew_allocation": AgentFamily.GCAGENT,
     "analyze_cost_variance": AgentFamily.GCAGENT,
     "generate_daily_field_report": AgentFamily.GCAGENT,
+    "generate_closeout_package": AgentFamily.GCAGENT,
 
     # PermitStream: permits / zoning / compliance
     "permit_submitted": AgentFamily.PERMIT_STREAM,
